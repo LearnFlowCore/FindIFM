@@ -1,5 +1,7 @@
 // Главное окружение desktop-приложения владеет окном, backend и завершением процессов.
 const crypto = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
 const { app, BrowserWindow, Notification, shell } = require('electron');
 const { startServer } = require('../src/server');
 
@@ -10,6 +12,8 @@ if (!hasLock) app.quit();
 let mainWindow = null;
 let service = null;
 let shutdownPromise = null;
+let developmentWatchers = [];
+let reloadTimer = null;
 
 function openExternal(url) {
   try {
@@ -59,6 +63,24 @@ async function createApplication() {
   mainWindow.once('ready-to-show', () => mainWindow.show());
   mainWindow.on('closed', () => { mainWindow = null; });
   await mainWindow.loadURL(`${service.url}/#token=${encodeURIComponent(token)}`);
+  startDevelopmentWatcher();
+}
+
+function startDevelopmentWatcher() {
+  if (app.isPackaged || developmentWatchers.length) return;
+  const root = path.resolve(__dirname, '..');
+  for (const folder of ['electron', 'src', 'public']) {
+    const target = path.join(root, folder);
+    if (!fs.existsSync(target)) continue;
+    developmentWatchers.push(fs.watch(target, { recursive: true }, (_event, filename) => {
+      if (!filename || reloadTimer) return;
+      reloadTimer = setTimeout(() => {
+        reloadTimer = null;
+        app.relaunch();
+        app.exit(0);
+      }, 500);
+    }));
+  }
 }
 
 async function shutdown() {
@@ -67,6 +89,8 @@ async function shutdown() {
       mainWindow?.hide();
       if (service) await service.stop();
       service = null;
+      developmentWatchers.forEach(watcher => watcher.close());
+      developmentWatchers = [];
     })();
   }
   return shutdownPromise;

@@ -48,6 +48,14 @@ class Repository {
     return { rows, groups, summary, total, page, limit };
   }
   allResults(jobId) { return this.db.prepare(`SELECT * FROM results ${jobId ? 'WHERE job_id=?' : ''} ORDER BY id DESC`).all(...(jobId ? [jobId] : [])); }
+  resultsByQueryDate(jobId) {
+    const history = this.db.prepare('SELECT * FROM search_history WHERE job_id=?').get(jobId);
+    if (!history?.extracted_date) throw new Error('В текущем поисковом запросе не указана дата.');
+    const rows = this.db.prepare(`SELECT * FROM results
+      WHERE job_id=? AND date IS NOT NULL AND date<>'' AND date>=? AND date<=?
+      ORDER BY date DESC, id DESC`).all(jobId, history.date_from, history.date_to);
+    return { rows, query: history.query, extractedDate: history.extracted_date, from: history.date_from, to: history.date_to };
+  }
   history() { return this.db.prepare('SELECT * FROM search_history ORDER BY id DESC').all(); }
   historyById(value) { return this.db.prepare('SELECT * FROM search_history WHERE id=? OR job_id=?').get(value, value); }
   presets() { return this.db.prepare('SELECT * FROM domain_presets ORDER BY name').all(); }

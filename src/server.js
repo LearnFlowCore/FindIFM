@@ -13,7 +13,7 @@ const { Repository } = require('./repository');
 const { YandexBrowser } = require('./browser');
 const { YandexHTMLProvider } = require('./search/provider');
 const { JobManager } = require('./jobs');
-const { exportXlsx } = require('./export');
+const { exportXlsx, exportCsv } = require('./export');
 
 async function startServer(options = {}) {
   const config = createConfig(options);
@@ -142,6 +142,19 @@ async function startServer(options = {}) {
     return { file: filename, url: `/exports/${encodeURIComponent(filename)}${token ? `?token=${encodeURIComponent(token)}` : ''}` };
   }
   app.post('/api/export', requireBody, asyncRoute(async (req, res) => res.json(await makeExport(req.body.scope || 'current', req.body.jobId))));
+  app.post('/api/export/by-query-date', requireBody, asyncRoute(async (req, res) => {
+    if (!req.body.jobId) throw Object.assign(new Error('Не выбран текущий запуск.'), { statusCode: 400 });
+    const selection = repo.resultsByQueryDate(req.body.jobId);
+    const stamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
+    const base = `results_query-date_${stamp}`;
+    const xlsx = `${base}.xlsx`; const csv = `${base}.csv`;
+    await exportXlsx(selection.rows, path.join(exportRoot, xlsx));
+    exportCsv(selection.rows, path.join(exportRoot, csv));
+    notify(`Выгрузка по дате запроса сохранена: ${selection.rows.length} ссылок`);
+    const link = file => `/exports/${encodeURIComponent(file)}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    return res.json({ query: selection.query, extractedDate: selection.extractedDate, from: selection.from, to: selection.to,
+      rows: selection.rows, count: selection.rows.length, xlsx: { file: xlsx, url: link(xlsx) }, csv: { file: csv, url: link(csv) } });
+  }));
   app.get('/api/export', asyncRoute(async (req, res) => {
     const result = await makeExport(req.query.jobId ? 'current' : 'all', req.query.jobId);
     res.redirect(result.url);

@@ -12,7 +12,7 @@ class JobManager {
     if (!this.accepting) throw new Error('Приложение завершает работу и не принимает новые задания.');
     const query = parseQuery(input);
     const id = crypto.randomUUID();
-    this.jobs.set(id, { id, status: 'queued', progress: 0, query, resultsCount: 0, duplicatesCount: 0, captcha: false, error: null });
+    this.jobs.set(id, { id, status: 'queued', progress: 0, query, results: [], resultsCount: 0, duplicatesCount: 0, captcha: false, error: null });
     this.repo.addHistory(id, query);
     this.queue = this.queue.then(() => this.run(id, query));
     return id;
@@ -50,7 +50,7 @@ class JobManager {
         });
       }
       this.repo.addResults(id, rows);
-      Object.assign(job, { status: 'completed', progress: 100, captcha: false, resultsCount: rows.length, duplicatesCount: duplicates });
+      Object.assign(job, { status: 'completed', progress: 100, captcha: false, results, resultsCount: rows.length, duplicatesCount: duplicates });
       this.repo.finishHistory(id, 'completed', rows.length, duplicates);
       this.notify(`Парсинг завершён: ${rows.length} результатов найдено, ${duplicates} дубликатов отброшено. Запрос: ${query.original}`);
     } catch (error) {

@@ -5,3 +5,16 @@ body{font-family:'Segoe UI',Arial,sans-serif}
 .search-rules{display:grid;gap:7px;margin-top:18px;padding:14px 16px;border-left:3px solid var(--teal);background:#f2faf8;color:var(--muted);font-size:12px;line-height:1.45}.search-rules strong{color:var(--ink);font-size:13px}.search-rules span:before{content:'— ';color:var(--teal);font-weight:700}
 .workflow-kicker{color:var(--teal);font:700 11px 'DM Mono',monospace;letter-spacing:1.4px;margin-bottom:8px}.workflow-step{display:flex;align-items:center;gap:10px;margin:22px 0 12px;color:var(--muted);font-size:12px}.workflow-step strong{color:var(--ink);font-size:14px}.step-number{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--navy);color:#fff;font-weight:700}.date-pair{position:relative}.date-reset{grid-column:1/-1;justify-self:start;padding:0;color:var(--blue);font-size:12px}.launch-button{min-width:230px}.table-wrap{overflow:auto}.table-wrap table{min-width:980px}
 @media(max-width:800px){.date-pair{grid-template-columns:1fr 1fr;gap:12px}.date-reset{grid-column:1/-1}.form-footer{align-items:stretch}.launch-button{width:100%;min-width:0}.workflow-step{align-items:flex-start;flex-wrap:wrap}.workflow-step span:last-child{width:100%;margin-left:34px}.table-card{margin-left:-2px;margin-right:-2px}.table-wrap table{min-width:900px}}
+.date-export { margin-top: 18px; padding: 18px; }
+.date-export-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.date-export-head strong, .date-export-head span { display: block; }
+.date-export-head span { margin-top: 5px; color: var(--muted, #667085); font-size: .9rem; }
+.date-export-tabs { display: flex; gap: 8px; margin: 18px 0 12px; border-bottom: 1px solid #dce4ea; }
+.date-export-tabs button { border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 8px 12px; cursor: pointer; color: #667085; }
+.date-export-tabs button.active { border-bottom-color: #17324d; color: #17324d; font-weight: 700; }
+.date-export-table { overflow-x: auto; }
+.date-export-table table { min-width: 760px; }
+.date-export-table td, .date-export-table th { padding: 9px 10px; text-align: left; vertical-align: top; }
+.date-export-table td:first-child { max-width: 280px; overflow-wrap: anywhere; }
+.date-export-downloads { display: flex; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 700px) { .date-export-head { align-items: stretch; flex-direction: column; } }

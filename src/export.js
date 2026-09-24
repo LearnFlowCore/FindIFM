@@ -22,4 +22,12 @@ async function exportXlsx(rows, filename) {
   await workbook.xlsx.writeFile(filename);
   return filename;
 }
-module.exports = { exportXlsx };
+function csvCell(value) { return `"${String(value ?? '').replaceAll('"', '""')}"`; }
+function exportCsv(rows, filename) {
+  const headers = ['URL', 'Заголовок страницы', 'Дата публикации', 'Краткое описание'];
+  const lines = [headers, ...rows.map(row => [row.url, row.title, row.date, row.description])]
+    .map(row => row.map(csvCell).join(';'));
+  require('node:fs').writeFileSync(filename, `\uFEFF${lines.join('\r\n')}\r\n`, 'utf8');
+  return filename;
+}
+module.exports = { exportXlsx, exportCsv };

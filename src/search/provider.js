@@ -24,8 +24,10 @@ class YandexHTMLProvider extends SearchProvider {
       try {
         const page = await this.browser.inspect(item.url, query, settings);
         if (!textMatches(`${page.title} ${page.text}`, query)) continue;
-        const date = parseDate(page.dateText) || parseDate(item.dateText);
-        if (!inRange(date, query)) continue;
+         const date = parseDate(page.dateText) || parseDate(item.dateText) || parseDate(item.url);
+         // If the query contains a date, only structured publication dates are valid.
+         if (query.extractedDate && (!date || !inRange(date, query))) continue;
+         if (!inRange(date, query)) continue;
         const aggregator = /(^|\.)dzen\.ru$/i.test(new URL(item.url).hostname);
         const sources = page.sources?.length ? page.sources : aggregator ? [] : [{ url: item.url }];
         for (const source of sources) {
@@ -39,8 +41,9 @@ class YandexHTMLProvider extends SearchProvider {
         this.log.warn({ url: item.url, error: error.message }, 'Не удалось загрузить найденную страницу');
         if (!snippetMatch) continue;
         if (/(^|\.)dzen\.ru$/i.test(new URL(item.url).hostname)) continue;
-        const date = parseDate(item.dateText);
-        if (!inRange(date, query)) continue;
+         const date = parseDate(item.dateText) || parseDate(item.url);
+         if (query.extractedDate && !date) continue;
+         if (!inRange(date, query)) continue;
         if (!domainAllowed(normalized, query.whitelist, query.blacklist) || candidateUrls.has(normalized)) continue;
         candidateUrls.add(normalized);
         candidates.push({ ...item, date, normalized, description: String(item.snippet || '').slice(0, 300), snippetMatch: true });
