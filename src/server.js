@@ -148,7 +148,10 @@ async function startServer(options = {}) {
   }));
   app.use((error, _req, res, _next) => {
     log.error({ error: error.stack || error.message }, 'Ошибка API');
-    res.status(error.statusCode || 500).json({ error: error.message || 'Внутренняя ошибка.' });
+    if (error instanceof SyntaxError && error.status === 400 && error.type === 'entity.parse.failed') {
+      return res.status(400).json({ error: 'API получил некорректный JSON.' });
+    }
+    return res.status(error.statusCode || 500).json({ error: error.message || 'Внутренняя ошибка.' });
   });
 
   const server = http.createServer(app);

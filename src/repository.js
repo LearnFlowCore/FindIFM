@@ -43,7 +43,9 @@ class Repository {
       .all(...args);
     const rows = this.db.prepare(`SELECT * FROM results ${clause} ORDER BY ${sort} ${order},id DESC LIMIT ? OFFSET ?`)
       .all(...args, limit, (page - 1) * limit);
-    return { rows, groups, total, page, limit };
+    const summary = this.db.prepare(`SELECT COUNT(*) AS publications, COUNT(DISTINCT domain) AS media,
+      MIN(date) AS date_from, MAX(date) AS date_to FROM results ${clause}`).get(...args);
+    return { rows, groups, summary, total, page, limit };
   }
   allResults(jobId) { return this.db.prepare(`SELECT * FROM results ${jobId ? 'WHERE job_id=?' : ''} ORDER BY id DESC`).all(...(jobId ? [jobId] : [])); }
   history() { return this.db.prepare('SELECT * FROM search_history ORDER BY id DESC').all(); }
