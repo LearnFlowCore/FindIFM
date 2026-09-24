@@ -8,3 +8,10 @@ test('временный профиль уникален для каждого �
   assert.notEqual(first.temporaryProfile, second.temporaryProfile);
   assert.match(first.temporaryProfile, /browser-profile-\d+-[a-f0-9]+$/);
 });
+
+test('создает новый временный профиль после блокировки старого', () => {
+  const browser = new YandexBrowser({}, {}, 'C:\\temp\\mention-monitor');
+  const first = browser.temporaryProfile;
+  browser.temporaryProfile = browser.newTemporaryProfile();
+  assert.notEqual(browser.temporaryProfile, first);
+});

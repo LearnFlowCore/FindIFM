@@ -27,22 +27,34 @@ class CaptchaError extends Error { constructor(message = 'Яндекс запр�
 class YandexBrowser {
   constructor(config, logger, dataRoot) {
     this.config = config; this.log = logger; this.dataRoot = dataRoot;
-    this.temporaryProfile = path.join(dataRoot, 'data', `browser-profile-${process.pid}-${crypto.randomBytes(4).toString('hex')}`);
+    this.temporaryProfile = this.newTemporaryProfile();
     this.browser = null; this.signature = null;
+  }
+  newTemporaryProfile() {
+    return path.join(this.dataRoot, 'data', `browser-profile-${process.pid}-${crypto.randomBytes(4).toString('hex')}`);
   }
   async open(settings) {
     const executablePath = settings.browserPath || this.config.browserExecutable;
     if (!fs.existsSync(executablePath)) throw new Error(`Яндекс Браузер не найден: ${executablePath}`);
-    const userDataDir = settings.profileType === 'user' && settings.profilePath
-      ? settings.profilePath : this.temporaryProfile;
+    const usesUserProfile = settings.profileType === 'user' && settings.profilePath;
+    const userDataDir = usesUserProfile ? settings.profilePath : this.temporaryProfile;
     const signature = `${executablePath}|${userDataDir}`;
     if (this.browser && this.signature !== signature) await this.close();
     if (this.browser?.connected) return this.browser;
     fs.mkdirSync(userDataDir, { recursive: true });
-    this.browser = await puppeteer.launch({
-      executablePath, headless: false, userDataDir, defaultViewport: null,
-      args: ['--no-first-run'],
-    });
+    try {
+      this.browser = await puppeteer.launch({
+        executablePath, headless: false, userDataDir, defaultViewport: null,
+        args: ['--no-first-run'],
+      });
+    } catch (error) {
+      // A disconnected Yandex process can leave the temporary profile locked.
+      // Never reuse that lock for the next search; user profiles are not rotated.
+      if (usesUserProfile || !/browser is already running|profile.*lock/i.test(error.message || '')) throw error;
+      this.temporaryProfile = this.newTemporaryProfile();
+      this.log.warn?.({ error: error.message }, 'Временный профиль Яндекса занят, запускаем новый');
+      return this.open(settings);
+    }
     this.signature = signature;
     this.browser.once('disconnected', () => { this.browser = null; this.signature = null; });
     return this.browser;
