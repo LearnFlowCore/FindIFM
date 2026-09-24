@@ -1,0 +1,11 @@
+node_modules/
+*.db
+*.db-wal
+*.db-shm
+profiles/
+exports/
+data/
+logs/
+.runtime/
+dist/
+release/

@@ -1,0 +1,67 @@
+{
+  "name": "mention-monitor-node",
+  "version": "1.0.0",
+  "description": "Локальный монитор упоминаний в новостной выдаче Яндекса",
+  "author": "Mention Monitor",
+  "private": true,
+  "type": "commonjs",
+  "main": "electron/main.js",
+  "engines": { "node": ">=22.12" },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js",
+    "desktop": "electron .",
+    "desktop:rebuild": "electron-builder install-app-deps",
+    "pack:win": "electron-builder --win --x64 --dir",
+    "dist:win": "electron-builder --win nsis --x64"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "exceljs": "^4.4.0",
+    "node-notifier": "^10.0.1",
+    "pino": "^9.6.0",
+    "puppeteer-core": "^25.11.0"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  },
+  "devDependencies": {
+    "electron": "44.4.5",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "ru.local.mentionmonitor",
+    "productName": "Монитор упоминаний",
+    "artifactName": "Mention-Monitor-Setup-${version}.${ext}",
+    "asar": true,
+    "asarUnpack": ["node_modules/node-notifier/vendor/**/*"],
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "public/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

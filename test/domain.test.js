@@ -1,0 +1,2 @@
+const test=require('node:test'); const assert=require('node:assert/strict'); const {domainAllowed}=require('../src/utils/domain');
+test('supports subdomains and exact rules',()=>{assert.equal(domainAllowed('https://news.example.com/a',['example.com'],[]),true);assert.equal(domainAllowed('https://example.com.evil/a',['=example.com'],[]),false);assert.equal(domainAllowed('https://x.example.com',['example.com'],['=x.example.com']),false);});
