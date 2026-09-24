@@ -17,4 +17,9 @@ body{font-family:'Segoe UI',Arial,sans-serif}
 .date-export-table td, .date-export-table th { padding: 9px 10px; text-align: left; vertical-align: top; }
 .date-export-table td:first-child { max-width: 280px; overflow-wrap: anywhere; }
 .date-export-downloads { display: flex; gap: 10px; flex-wrap: wrap; }
+.result-save-panel { display: grid; gap: 12px; margin: 16px 0; padding: 18px; }
+.result-save-panel strong, .result-save-panel span { display: block; }
+.result-save-panel span { margin-top: 5px; color: #667085; font-size: .9rem; }
+.result-save-panel textarea { width: 100%; box-sizing: border-box; min-height: 110px; resize: vertical; font: .9rem/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.result-save-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 @media (max-width: 700px) { .date-export-head { align-items: stretch; flex-direction: column; } }

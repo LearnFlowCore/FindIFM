@@ -44,7 +44,7 @@ class YandexBrowser {
     fs.mkdirSync(userDataDir, { recursive: true });
     try {
       this.browser = await puppeteer.launch({
-        executablePath, headless: false, userDataDir, defaultViewport: null,
+        executablePath, headless: true, userDataDir, defaultViewport: null,
         args: ['--no-first-run'],
       });
     } catch (error) {

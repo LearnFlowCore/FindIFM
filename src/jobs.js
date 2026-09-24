@@ -1,6 +1,7 @@
 // Асинхронные задания связывают запрос, провайдер, базу и уведомления.
 const crypto = require('node:crypto');
 const { parseQuery } = require('./utils/query');
+const { exportTxtToDownloads } = require('./export');
 
 class JobManager {
   constructor(repo, provider, logger, notify, internetCheck) {
@@ -50,9 +51,10 @@ class JobManager {
         });
       }
       this.repo.addResults(id, rows);
-      Object.assign(job, { status: 'completed', progress: 100, captcha: false, results, resultsCount: rows.length, duplicatesCount: duplicates });
+      const textFile = exportTxtToDownloads(rows);
+      Object.assign(job, { status: 'completed', progress: 100, captcha: false, results, resultsCount: rows.length, duplicatesCount: duplicates, textFile });
       this.repo.finishHistory(id, 'completed', rows.length, duplicates);
-      this.notify(`Парсинг завершён: ${rows.length} результатов найдено, ${duplicates} дубликатов отброшено. Запрос: ${query.original}`);
+      this.notify(`Парсинг завершён: ${rows.length} результатов найдено. TXT сохранён: ${textFile}`);
     } catch (error) {
       this.log.error({ error: error.stack || error.message, jobId: id }, 'Ошибка поискового задания');
       Object.assign(job, { status: 'failed', error: error.message || 'Неизвестная ошибка поискового задания', progress: 100 });

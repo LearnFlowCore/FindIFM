@@ -1,5 +1,8 @@
 // Формирование совместимой с Excel книги с базовым оформлением.
 const ExcelJS = require('exceljs');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
 async function exportXlsx(rows, filename) {
   const workbook = new ExcelJS.Workbook();
@@ -30,4 +33,22 @@ function exportCsv(rows, filename) {
   require('node:fs').writeFileSync(filename, `\uFEFF${lines.join('\r\n')}\r\n`, 'utf8');
   return filename;
 }
-module.exports = { exportXlsx, exportCsv };
+function downloadsFolder() {
+  const home = os.homedir();
+  const localized = path.join(home, 'Загрузки');
+  const standard = path.join(home, 'Downloads');
+  if (fs.existsSync(localized)) return localized;
+  fs.mkdirSync(standard, { recursive: true });
+  return standard;
+}
+function exportTxt(rows, filename) {
+  const links = rows.map(row => String(row.url || '').trim()).filter(Boolean);
+  fs.writeFileSync(filename, links.length ? `${links.join('\r\n')}\r\n` : '', 'utf8');
+  return filename;
+}
+function exportTxtToDownloads(rows, stamp = new Date()) {
+  const value = stamp.toISOString().slice(0, 19).replaceAll(':', '-');
+  const file = path.join(downloadsFolder(), `mention-monitor_${value}.txt`);
+  return exportTxt(rows, file);
+}
+module.exports = { exportXlsx, exportCsv, exportTxt, exportTxtToDownloads, downloadsFolder };
