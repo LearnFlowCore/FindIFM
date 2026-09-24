@@ -98,10 +98,12 @@ class YandexBrowser {
   }
   async waitForNewsCards(page) {
     try {
-      await page.waitForSelector('a.news-link-new_primary[href],a[class*="InstoryList__title"][href]', { timeout: 15000 });
+      await page.waitForSelector('a.news-link-new_primary[href],a[class*="InstoryList__title"][href],a[href*="/news/story/"]', { timeout: 15000 });
+      return true;
     } catch (error) {
-      if (!/timeout/i.test(error.message || '') || page.isClosed()) throw error;
-      this.log.debug?.({ error: error.message }, 'Новостные карточки не появились до тайм-аута');
+      if (page.isClosed()) return false;
+      this.log.warn?.({ error: error.message }, 'Новостные карточки не появились до тайм-аута, продолжаем без падения задания');
+      return true;
     }
   }
   async navigate(page, url, timeout = 20000) {
@@ -130,9 +132,11 @@ class YandexBrowser {
         const response = await this.navigate(page, url);
         if (response?.status() === 429) { await sleep(60000); throw new CaptchaError('Яндекс вернул HTTP 429'); }
         if (!(await this.waitForResults(page, settings, onCaptcha))) break;
-        await this.waitForNewsCards(page);
-        const rows = await this.evaluate(page, () => {
-          const storyLinks = [...document.querySelectorAll('a.news-link-new_primary[href],a[class*="InstoryList__title"][href]')];
+        if (!(await this.waitForNewsCards(page))) break;
+        let rows;
+        try {
+          rows = await this.evaluate(page, () => {
+          const storyLinks = [...document.querySelectorAll('a.news-link-new_primary[href],a[class*="InstoryList__title"][href],a[href*="/news/story/"]')];
           if (storyLinks.length) {
             return storyLinks.map(link => {
               const node = link.closest('.news-search-content__block,[class*="InstoryList__content"]') || link.parentElement;
@@ -159,7 +163,14 @@ class YandexBrowser {
               searchType: 'news',
             } : null;
           }).filter(Boolean);
-        });
+          });
+        } catch (error) {
+          if (page.isClosed() || /execution context|detached frame|cannot find context/i.test(error.message || '')) {
+            this.log.warn?.({ error: error.message }, 'Страница выдачи изменилась во время чтения, пропускаем её');
+            break;
+          }
+          throw error;
+        }
         collected.push(...rows);
         if (!rows.length) break;
         await sleep(randomDelay(settings.pageDelay, settings.pageJitter));

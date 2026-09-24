@@ -40,3 +40,9 @@ test('ожидает появления карточек новостной вы
   await browser.waitForNewsCards(page);
   assert.match(selector, /news-link-new_primary/);
 });
+
+test('не превращает тайм-аут карточек в ошибку задания', async () => {
+  const browser = new YandexBrowser({}, { warn() {} }, '');
+  const page = { isClosed: () => false, waitForSelector: async () => { throw new Error('TimeoutError: waiting'); } };
+  assert.equal(await browser.waitForNewsCards(page), true);
+});
