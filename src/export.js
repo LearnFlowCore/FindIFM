@@ -46,9 +46,8 @@ function exportTxt(rows, filename) {
   fs.writeFileSync(filename, links.length ? `${links.join('\r\n')}\r\n` : '', 'utf8');
   return filename;
 }
-function exportTxtToDownloads(rows, stamp = new Date()) {
-  const value = stamp.toISOString().slice(0, 19).replaceAll(':', '-');
-  const file = path.join(downloadsFolder(), `mention-monitor_${value}.txt`);
+function exportTxtToDownloads(rows) {
+  const file = path.join(downloadsFolder(), 'FindIFM.txt');
   return exportTxt(rows, file);
 }
 module.exports = { exportXlsx, exportCsv, exportTxt, exportTxtToDownloads, downloadsFolder };
