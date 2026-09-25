@@ -35,3 +35,23 @@ test('API возвращает JSON при некорректном теле з�
     fs.rmSync(folder, { recursive: true, force: true });
   }
 });
+
+test('API формирует FindIFM.txt с одной ссылкой на строке', async () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'mention-monitor-txt-'));
+  const service = await startServer({ dataRoot: folder, host: '127.0.0.1', port: 0, token: 'test-token' });
+  try {
+    const response = await fetch(`${service.url}/api/export/txt`, {
+      method: 'POST', headers: { 'X-App-Token': 'test-token', 'Content-Type': 'application/json' }, body: '{}',
+    });
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.file, 'FindIFM.txt');
+    assert.equal(result.count, 0);
+    const download = await fetch(`${service.url}${result.url}`);
+    assert.equal(download.status, 200);
+    assert.equal(await download.text(), '');
+  } finally {
+    await service.stop();
+    fs.rmSync(folder, { recursive: true, force: true });
+  }
+});

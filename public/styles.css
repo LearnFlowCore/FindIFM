@@ -22,4 +22,14 @@ body{font-family:'Segoe UI',Arial,sans-serif}
 .result-save-panel span { margin-top: 5px; color: #667085; font-size: .9rem; }
 .result-save-panel textarea { width: 100%; box-sizing: border-box; min-height: 110px; resize: vertical; font: .9rem/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; }
 .result-save-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.settings-save-results { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 28px; align-items: center; margin: 22px 0; padding: 24px; background: linear-gradient(135deg, #14243b 0%, #203e5c 100%); color: #fff; }
+.save-results-kicker { color: #61d5c0; font: 700 10px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: 1.2px; }
+.settings-save-results h3 { margin: 7px 0 8px; font-size: 20px; }
+.settings-save-results p { max-width: 720px; margin: 0; color: #c4cfdd; line-height: 1.55; }
+.settings-save-results p strong { color: #fff; }
+.save-results-meta { display: flex; gap: 16px; margin-top: 15px; color: #8fa6be; font-size: 12px; flex-wrap: wrap; }
+.save-results-action { min-width: 220px; display: grid; gap: 9px; }
+.save-results-action .button { width: 100%; }
+.save-results-action > span { color: #9fb0c4; font-size: 11px; text-align: center; }
 @media (max-width: 700px) { .date-export-head { align-items: stretch; flex-direction: column; } }
+@media (max-width: 800px) { .settings-save-results { grid-template-columns: 1fr; padding: 19px; } .save-results-action { min-width: 0; } }

@@ -13,7 +13,7 @@ const { Repository } = require('./repository');
 const { YandexBrowser } = require('./browser');
 const { YandexHTMLProvider } = require('./search/provider');
 const { JobManager } = require('./jobs');
-const { exportXlsx, exportCsv } = require('./export');
+const { exportXlsx, exportCsv, exportTxt } = require('./export');
 
 async function startServer(options = {}) {
   const config = createConfig(options);
@@ -142,6 +142,15 @@ async function startServer(options = {}) {
     return { file: filename, url: `/exports/${encodeURIComponent(filename)}${token ? `?token=${encodeURIComponent(token)}` : ''}` };
   }
   app.post('/api/export', requireBody, asyncRoute(async (req, res) => res.json(await makeExport(req.body.scope || 'current', req.body.jobId))));
+  app.post('/api/export/txt', requireBody, asyncRoute(async (req, res) => {
+    const rows = repo.allResults(req.body.jobId || null);
+    const filename = 'FindIFM.txt';
+    const file = path.join(exportRoot, filename);
+    exportTxt(rows, file);
+    notify(`TXT сохранён: ${rows.length} ссылок`);
+    return res.json({ file: filename, count: rows.length,
+      url: `/exports/${encodeURIComponent(filename)}${token ? `?token=${encodeURIComponent(token)}` : ''}` });
+  }));
   app.post('/api/export/by-query-date', requireBody, asyncRoute(async (req, res) => {
     if (!req.body.jobId) throw Object.assign(new Error('Не выбран текущий запуск.'), { statusCode: 400 });
     const selection = repo.resultsByQueryDate(req.body.jobId);
