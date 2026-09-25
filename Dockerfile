@@ -15,8 +15,8 @@ ENV NODE_ENV=production \
   PORT=10000 \
   OPEN_BROWSER=0 \
   YANDEX_BROWSER_PATH=/usr/bin/chromium \
-  DATA_ROOT=/var/data \
-  DOWNLOADS_PATH=/var/data/exports
+  DATA_ROOT=/tmp/findifm \
+  DOWNLOADS_PATH=/tmp/findifm/exports
 
 EXPOSE 10000
 CMD ["node", "src/server.js"]
