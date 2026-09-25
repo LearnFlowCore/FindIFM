@@ -22,6 +22,12 @@ body{font-family:'Segoe UI',Arial,sans-serif}
 .result-save-panel span { margin-top: 5px; color: #667085; font-size: .9rem; }
 .result-save-panel textarea { width: 100%; box-sizing: border-box; min-height: 110px; resize: vertical; font: .9rem/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; }
 .result-save-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.result-filter-fields { display: grid; grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(120px, 1fr)) auto; gap: 12px; align-items: end; margin: 10px 0 16px; padding: 16px; }
+.result-filter-fields .field { gap: 5px; }
+.filter-heading { grid-column: 1 / -1; display: grid; gap: 4px; }
+.filter-heading span { color: var(--muted); font-size: 12px; }
+@media (max-width: 1000px) { .result-filter-fields { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 700px) { .result-filter-fields { grid-template-columns: 1fr; } }
 .settings-save-results { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 28px; align-items: center; margin: 22px 0; padding: 24px; background: linear-gradient(135deg, #14243b 0%, #203e5c 100%); color: #fff; }
 .save-results-kicker { color: #61d5c0; font: 700 10px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: 1.2px; }
 .settings-save-results h3 { margin: 7px 0 8px; font-size: 20px; }

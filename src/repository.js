@@ -36,6 +36,9 @@ class Repository {
     if (options.jobId) { where.push('job_id=?'); args.push(options.jobId); }
     if (options.includeUnknownDate === false || options.undefinedDate === false) where.push("date IS NOT NULL AND date<>''");
     if (options.status) { where.push('status=?'); args.push(options.status); }
+    if (options.domain) { where.push('domain LIKE ?'); args.push(`%${options.domain}%`); }
+    if (options.dateFrom) { where.push('date IS NOT NULL AND date>=?'); args.push(options.dateFrom); }
+    if (options.dateTo) { where.push('date IS NOT NULL AND date<=?'); args.push(options.dateTo); }
     if (options.q) { where.push('(title LIKE ? OR url LIKE ? OR domain LIKE ? OR description LIKE ? OR query LIKE ?)'); args.push(...Array(5).fill(`%${options.q}%`)); }
     const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const total = this.db.prepare(`SELECT COUNT(*) AS count FROM results ${clause}`).get(...args).count;

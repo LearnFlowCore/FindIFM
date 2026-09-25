@@ -95,6 +95,7 @@ async function startServer(options = {}) {
   app.get('/api/results', (req, res) => res.json(repo.results({
     jobId: req.query.jobId, page: req.query.page, limit: req.query.limit || req.query.pageSize,
     sort: req.query.sort, order: req.query.order, q: req.query.q, status: req.query.status,
+    domain: req.query.domain, dateFrom: req.query.dateFrom, dateTo: req.query.dateTo,
     includeUnknownDate: req.query.includeUnknownDate !== 'false' && req.query.undefinedDate !== 'false',
   })));
   app.delete('/api/results/:id', rejectWhileBusy, (req, res) => repo.deleteResult(req.params.id)
