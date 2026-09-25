@@ -35,6 +35,15 @@ npm test
 npm start
 ```
 
+## Render
+
+Репозиторий содержит `render.yaml` и `Dockerfile` для серверного запуска. Render
+устанавливает Chromium, запускает его в фоновом режиме и хранит SQLite, логи и
+экспорты на диске `/var/data`. Изменения ветки `main` развёртываются автоматически.
+
+Для ручного создания сервиса используйте Render Blueprint из репозитория
+`LearnFlowCore/FindIFM`.
+
 Desktop-режим для разработчика и сборка установщика:
 
 ```powershell
