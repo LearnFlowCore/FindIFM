@@ -52,7 +52,7 @@ class JobManager {
       }
       this.repo.addResults(id, rows);
       const textFile = exportTxtToDownloads(rows);
-      Object.assign(job, { status: 'completed', progress: 100, captcha: false, results, resultsCount: rows.length, duplicatesCount: duplicates, textFile });
+      Object.assign(job, { status: 'completed', progress: 100, captcha: false, results: rows, resultsCount: rows.length, duplicatesCount: duplicates, textFile });
       this.repo.finishHistory(id, 'completed', rows.length, duplicates);
       this.notify(`Парсинг завершён: ${rows.length} результатов найдено. TXT сохранён: ${textFile}`);
     } catch (error) {
