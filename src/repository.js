@@ -3,7 +3,7 @@ const DEFAULT_SETTINGS = {
   browserPath: '',
   profileType: 'temporary', profilePath: '', userAgent: 'Автоматический User-Agent браузера',
   pageDelay: 2000, pageJitter: 500, resultDelay: 1000, resultJitter: 300,
-  maxPages: 5, captchaStrategy: 'stop', notifications: true,
+  maxPages: 5, captchaStrategy: process.env.CAPTCHA_STRATEGY || 'stop', notifications: true,
   exportFolder: 'exports', showUnknownDate: true,
 };
 

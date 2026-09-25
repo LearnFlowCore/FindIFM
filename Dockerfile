@@ -14,6 +14,7 @@ ENV NODE_ENV=production \
   HOST=0.0.0.0 \
   PORT=10000 \
   OPEN_BROWSER=0 \
+  CAPTCHA_STRATEGY=skip \
   YANDEX_BROWSER_PATH=/usr/bin/chromium \
   DATA_ROOT=/tmp/findifm \
   DOWNLOADS_PATH=/tmp/findifm/exports
