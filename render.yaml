@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: findifm
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/status
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: OPEN_BROWSER
+        value: "0"
+      - key: YANDEX_BROWSER_PATH
+        value: /usr/bin/chromium
+      - key: DATA_ROOT
+        value: /var/data
+      - key: DOWNLOADS_PATH
+        value: /var/data/exports
+    disk:
+      name: findifm-data
+      mountPath: /var/data
+      sizeGB: 1

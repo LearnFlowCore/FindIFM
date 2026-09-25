@@ -34,6 +34,10 @@ function exportCsv(rows, filename) {
   return filename;
 }
 function downloadsFolder() {
+  if (process.env.DOWNLOADS_PATH) {
+    fs.mkdirSync(process.env.DOWNLOADS_PATH, { recursive: true });
+    return process.env.DOWNLOADS_PATH;
+  }
   const home = os.homedir();
   const localized = path.join(home, 'Загрузки');
   const standard = path.join(home, 'Downloads');

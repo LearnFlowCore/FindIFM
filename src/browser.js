@@ -45,7 +45,7 @@ class YandexBrowser {
     try {
       this.browser = await puppeteer.launch({
         executablePath, headless: true, userDataDir, defaultViewport: null,
-        args: ['--no-first-run'],
+        args: ['--no-first-run', ...(process.platform === 'linux' ? ['--no-sandbox', '--disable-dev-shm-usage'] : [])],
       });
     } catch (error) {
       // A disconnected Yandex process can leave the temporary profile locked.

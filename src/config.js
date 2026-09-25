@@ -15,7 +15,7 @@ function findYandexBrowser() {
 }
 
 function createConfig(overrides = {}) {
-  const dataRoot = path.resolve(overrides.dataRoot || projectRoot);
+  const dataRoot = path.resolve(overrides.dataRoot || process.env.DATA_ROOT || projectRoot);
   const port = overrides.port ?? Number(process.env.PORT || 3080);
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Некорректный порт приложения.');
   return {
