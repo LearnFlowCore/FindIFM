@@ -6,7 +6,9 @@
   "private": true,
   "type": "commonjs",
   "main": "electron/main.js",
-  "engines": { "node": ">=22.12" },
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "start": "node src/server.js",
     "test": "node --test test/*.test.js",
@@ -16,8 +18,9 @@
     "dist:win": "electron-builder --win nsis --x64"
   },
   "dependencies": {
-    "express": "^4.21.2",
+    "electron-updater": "^6.8.9",
     "exceljs": "^4.4.0",
+    "express": "^4.21.2",
     "node-notifier": "^10.0.1",
     "pino": "^9.6.0",
     "puppeteer-core": "^25.11.0"
@@ -34,7 +37,9 @@
     "productName": "Монитор упоминаний",
     "artifactName": "Mention-Monitor-Setup-${version}.${ext}",
     "asar": true,
-    "asarUnpack": ["node_modules/node-notifier/vendor/**/*"],
+    "asarUnpack": [
+      "node_modules/node-notifier/vendor/**/*"
+    ],
     "files": [
       "electron/**/*",
       "src/**/*",
@@ -44,12 +49,20 @@
     "directories": {
       "output": "dist"
     },
+    "publish": {
+      "provider": "github",
+      "owner": "LearnFlowCore",
+      "repo": "FindIFM",
+      "releaseType": "release"
+    },
     "win": {
       "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },

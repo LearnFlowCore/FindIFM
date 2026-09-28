@@ -3,6 +3,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { app, BrowserWindow, Notification, shell } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const { startServer } = require('../src/server');
 
 app.setName('Mention Monitor');
@@ -14,12 +15,33 @@ let service = null;
 let shutdownPromise = null;
 let developmentWatchers = [];
 let reloadTimer = null;
+let updateTimer = null;
 
 function openExternal(url) {
   try {
     const target = new URL(url);
     if (['http:', 'https:'].includes(target.protocol)) shell.openExternal(target.toString());
   } catch {}
+}
+
+function setupAutoUpdater() {
+  if (!app.isPackaged) return;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on('update-available', info => {
+    console.log(`Доступно обновление ${info.version}, загрузка началась`);
+    if (Notification.isSupported()) new Notification({ title: 'Монитор упоминаний', body: `Доступно обновление ${info.version}. Оно будет установлено после перезапуска.` }).show();
+  });
+  autoUpdater.on('update-downloaded', info => {
+    const notification = Notification.isSupported()
+      ? new Notification({ title: 'Монитор упоминаний', body: `Обновление ${info.version} загружено. Перезапустите приложение для установки.` })
+      : null;
+    notification?.on('click', () => autoUpdater.quitAndInstall());
+  });
+  autoUpdater.on('error', error => console.error('Ошибка автообновления:', error.message));
+  const check = () => autoUpdater.checkForUpdates().catch(error => console.error('Проверка обновлений не выполнена:', error.message));
+  setTimeout(check, 10000);
+  updateTimer = setInterval(check, 6 * 60 * 60 * 1000);
 }
 
 async function createApplication() {
@@ -63,6 +85,7 @@ async function createApplication() {
   mainWindow.once('ready-to-show', () => mainWindow.show());
   mainWindow.on('closed', () => { mainWindow = null; });
   await mainWindow.loadURL(`${service.url}/#token=${encodeURIComponent(token)}`);
+  setupAutoUpdater();
   startDevelopmentWatcher();
 }
 
@@ -88,7 +111,9 @@ async function shutdown() {
     shutdownPromise = (async () => {
       mainWindow?.hide();
       if (service) await service.stop();
-      service = null;
+       service = null;
+       if (updateTimer) clearInterval(updateTimer);
+       updateTimer = null;
       developmentWatchers.forEach(watcher => watcher.close());
       developmentWatchers = [];
     })();
