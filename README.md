@@ -62,6 +62,17 @@ $env:ELECTRON_BUILDER_BINARIES_MIRROR = 'https://npmmirror.com/mirrors/electron-
 npm run dist:win
 ```
 
+Автообновление desktop-версии работает через GitHub Releases. Для выпуска новой
+версии увеличьте `version` в `package.json`, создайте и отправьте тег вида `v1.0.1`:
+
+```powershell
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+Workflow `Publish Windows release` соберёт установщик, `latest.yml` и blockmap.
+Установленная программа проверяет релизы при запуске и затем каждые шесть часов.
+
 ## Структура
 
 ```text
