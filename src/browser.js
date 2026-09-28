@@ -89,9 +89,13 @@ class YandexBrowser {
         || links.find(link => normalize(link.textContent).includes('новости') && isNewsTarget(link));
       return tab?.href || '';
     });
-    // В текущем интерфейсе Яндекса вкладка может быть скрыта; официальный URL
-    // перенаправляет на актуальную новостную вкладку Дзена.
-    return href || 'https://yandex.ru/news/search';
+    // Вкладка иногда скрыта в интерфейсе. Параметр type=news оставляет поиск
+    // на Яндексе и не зависит от меняющейся разметки новостного агрегатора.
+    if (href) {
+      const target = new URL(href);
+      if (/(^|\.)yandex\.ru$/i.test(target.hostname)) return href;
+    }
+    return 'https://yandex.ru/search/?type=news';
   }
   async isCaptcha(page) {
     const state = await this.evaluate(page, () => ({
@@ -110,7 +114,7 @@ class YandexBrowser {
   }
   async waitForNewsCards(page) {
     try {
-      await page.waitForSelector('a.news-link-new_primary[href],a[class*="InstoryList__title"][href],a[href*="/news/story/"]', { timeout: 15000 });
+      await page.waitForSelector('a.news-link-new_primary[href],a[class*="InstoryList__title"][href],a[href*="/news/story/"],li.serp-item h2 a[href],li.serp-item h3 a[href],.OrganicTitle-Link[href],[class*="OrganicTitle"] a[href]', { timeout: 15000 });
       return true;
     } catch (error) {
       if (page.isClosed()) return false;
@@ -148,7 +152,7 @@ class YandexBrowser {
         let rows;
         try {
           rows = await this.evaluate(page, () => {
-          const storyLinks = [...document.querySelectorAll('a.news-link-new_primary[href],a[class*="InstoryList__title"][href],a[href*="/news/story/"]')];
+           const storyLinks = [...document.querySelectorAll('a.news-link-new_primary[href],a[class*="InstoryList__title"][href],a[href*="/news/story/"]')];
           if (storyLinks.length) {
             return storyLinks.map(link => {
               const node = link.closest('.news-search-content__block,[class*="InstoryList__content"]') || link.parentElement;
@@ -166,7 +170,7 @@ class YandexBrowser {
           ];
           const nodes = [...new Set(document.querySelectorAll(selectors.join(',')))];
           return nodes.map(node => {
-            const link = node.querySelector('a[href][class*="title"],h2 a[href],h3 a[href],a.OrganicTitle-Link');
+             const link = node.querySelector('a[href][class*="title"],h2 a[href],h3 a[href],a.OrganicTitle-Link,[class*="OrganicTitle"] a[href]');
             const snippet = node.querySelector('[class*="snippet"],[class*="text"],.OrganicTextContentSpan');
             const date = node.querySelector('time,[class*="date"],[class*="time"]');
             return link ? {

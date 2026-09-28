@@ -39,6 +39,19 @@ test('ожидает появления карточек новостной вы
   };
   await browser.waitForNewsCards(page);
   assert.match(selector, /news-link-new_primary/);
+  assert.match(selector, /OrganicTitle-Link/);
+});
+
+test('использует новостной тип поиска Яндекса, если вкладка скрыта', async () => {
+  const browser = new YandexBrowser({}, {}, '');
+  browser.evaluate = async () => '';
+  assert.equal(await browser.newsTabUrl({}), 'https://yandex.ru/search/?type=news');
+});
+
+test('не переводит резервный новостной поиск на Дзен', async () => {
+  const browser = new YandexBrowser({}, {}, '');
+  browser.evaluate = async () => 'https://dzen.ru/news/search?issue_tld=ru';
+  assert.equal(await browser.newsTabUrl({}), 'https://yandex.ru/search/?type=news');
 });
 
 test('не превращает тайм-аут карточек в ошибку задания', async () => {
