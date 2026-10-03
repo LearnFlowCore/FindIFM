@@ -84,7 +84,7 @@ class YandexBrowser {
     onCaptcha?.();
     if (settings.captchaStrategy === 'skip') throw new CaptchaError('Яндекс запросил CAPTCHA; поиск остановлен.');
     if (settings.captchaStrategy === 'manual') this.captchaPage = page;
-    const expiresAt = Date.now() + 15 * 60000;
+    const expiresAt = settings.captchaStrategy === 'manual' ? Date.now() + 15 * 60000 : Infinity;
     try {
       while (page && !page.isClosed()) {
         if (hooks.isCancelled?.()) throw new Error('Поиск остановлен пользователем');
