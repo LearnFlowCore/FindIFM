@@ -8,12 +8,13 @@ class JobManager {
   constructor(repo, provider, logger, notify, internetCheck) {
     this.repo = repo; this.provider = provider; this.log = logger;
     this.notify = notify; this.internetCheck = internetCheck; this.jobs = new Map();
-    this.queue = Promise.resolve(); this.accepting = true; this.running = false;
+    this.queue = Promise.resolve(); this.accepting = true; this.running = false; this.captchaTokens = new Map();
   }
   start(input) {
     if (!this.accepting) throw new Error('Приложение завершает работу и не принимает новые задания.');
     const query = parseQuery(input);
     const id = crypto.randomUUID();
+    this.captchaTokens.set(id, crypto.randomBytes(32).toString('hex'));
     this.jobs.set(id, { id, status: 'queued', progress: 0, query, results: [], resultsCount: 0, duplicatesCount: 0, captcha: false, error: null, checkedPages: 0, liveMatches: 0, skippedErrors: 0, recentChecks: [], startedAt: null });
     this.repo.addHistory(id, query);
     this.repo.addTaskLog(id, 'info', 'queued', 'Задача поставлена в очередь');
@@ -22,7 +23,7 @@ class JobManager {
   }
   async run(id, query) {
     const job = this.jobs.get(id);
-    if (job.cancelled) return;
+    if (job.cancelled) { this.captchaTokens.delete(id); return; }
     this.running = true;
     try {
        job.status = 'running'; job.progress = 5; job.startedAt = Date.now();
@@ -34,18 +35,23 @@ class JobManager {
         throw new Error('Нет интернет-соединения');
       }
        const settings = this.repo.settings();
-       // На Render браузер без интерфейса: ждать ручного ввода CAPTCHA нельзя.
-       if (process.platform === 'linux') settings.captchaStrategy = 'skip';
+       if (process.platform === 'linux') settings.captchaStrategy = 'manual';
        if (query.quickTest) { settings.maxPages = 1; settings.maxResults = 5; settings.maxDurationMinutes = Math.min(settings.maxDurationMinutes, 5); query.deepPages = 0; }
       const { candidates, withinDuplicates } = await this.provider.search(query, settings, {
         isCancelled: () => Boolean(job.cancelled),
         onCaptcha: () => {
           job.captcha = true; job.status = 'waiting_captcha'; job.message = settings.captchaStrategy === 'skip'
-            ? 'Яндекс запросил CAPTCHA: поиск будет остановлен. На Render подтверждение недоступно.'
+            ? 'Яндекс запросил CAPTCHA: поиск будет остановлен.'
+            : settings.captchaStrategy === 'manual' ? 'Яндекс запросил CAPTCHA: пройдите проверку ниже на странице результатов (до 15 минут).'
             : 'Капча/блокировка: пройдите проверку в окне Яндекс Браузера';
           this.repo.updateTask(id, 'waiting_captcha', job.progress, job.message);
           this.repo.addTaskLog(id, 'warn', 'captcha', job.message);
           this.notify('captcha', job.message);
+        },
+        onCaptchaSolved: () => {
+          job.status = 'running'; job.captcha = false; job.message = 'CAPTCHA подтверждена, поиск продолжается';
+          this.repo.updateTask(id, 'running', job.progress, job.message);
+          this.repo.addTaskLog(id, 'info', 'captcha_solved', job.message);
         },
         onCheckpoint: (page, count) => {
           const progress = Math.min(80, 5 + Math.round((page / Math.max(1, settings.maxPages)) * 70));
@@ -111,6 +117,7 @@ class JobManager {
        this.repo.addTaskLog(id, cancelled ? 'info' : 'error', job.status, cancelled ? 'Задача остановлена' : job.error);
       if (!cancelled) this.notify('failed', `Ошибка поиска «${query.original}»: ${job.error}`);
     } finally {
+      this.captchaTokens.delete(id);
       this.running = false;
       if (this.jobs.size > 100) {
         const finished = [...this.jobs].filter(([, item]) => !['queued', 'running'].includes(item.status));
@@ -119,6 +126,8 @@ class JobManager {
     }
   }
   get(id) { return this.jobs.get(id) || null; }
+  captchaToken(id) { return this.captchaTokens.get(id); }
+  canControlCaptcha(id, token) { return this.jobs.get(id)?.status === 'waiting_captcha' && !!token && this.captchaTokens.get(id) === token; }
   list(status) { return this.repo.tasks({ status }).map(row => ({ ...row, live: this.jobs.get(row.job_id) || null })); }
   logs(id, limit) { return this.repo.taskLogs(id, limit); }
   async stop(id) {

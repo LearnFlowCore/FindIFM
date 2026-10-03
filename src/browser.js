@@ -25,7 +25,7 @@ class YandexBrowser {
   constructor(config, logger, dataRoot) {
     this.config = config; this.log = logger; this.dataRoot = dataRoot;
     this.temporaryProfile = this.newTemporaryProfile();
-    this.browser = null; this.signature = null;
+    this.browser = null; this.signature = null; this.captchaPage = null;
   }
   newTemporaryProfile() {
     return path.join(this.dataRoot, 'data', `browser-profile-${process.pid}-${crypto.randomBytes(4).toString('hex')}`);
@@ -78,13 +78,44 @@ class YandexBrowser {
     }));
     return state.captcha || /captcha|showcaptcha|подтвердите/i.test(`${state.url} ${state.title}`);
   }
-  async waitForResults(page, settings, onCaptcha) {
+  async waitForResults(page, settings, onCaptcha, hooks = {}) {
     await sleep(2500);
     if (!(await this.isCaptcha(page))) return true;
     onCaptcha?.();
-    if (settings.captchaStrategy === 'skip') throw new CaptchaError('Яндекс запросил CAPTCHA. На Render ручное подтверждение недоступно; повторите поиск позже.');
-    while (page && !page.isClosed() && await this.isCaptcha(page)) await sleep(2000);
-    return true;
+    if (settings.captchaStrategy === 'skip') throw new CaptchaError('Яндекс запросил CAPTCHA; поиск остановлен.');
+    if (settings.captchaStrategy === 'manual') this.captchaPage = page;
+    const expiresAt = Date.now() + 15 * 60000;
+    try {
+      while (page && !page.isClosed()) {
+        if (hooks.isCancelled?.()) throw new Error('Поиск остановлен пользователем');
+        if (Date.now() >= expiresAt) throw new CaptchaError('Время ручного подтверждения CAPTCHA истекло (15 минут).');
+        await sleep(2000);
+        if (!(await this.isCaptcha(page))) { hooks.onCaptchaSolved?.(); return true; }
+      }
+      throw new CaptchaError('Окно CAPTCHA закрыто до подтверждения.');
+    } finally { if (this.captchaPage === page) this.captchaPage = null; }
+  }
+  async captchaScreenshot() {
+    const page = this.captchaPage;
+    if (!page || page.isClosed()) throw new Error('Окно CAPTCHA уже недоступно.');
+    const image = await page.screenshot({ type: 'jpeg', quality: 70 });
+    return { image: `data:image/jpeg;base64,${image.toString('base64')}`, width: page.viewport().width, height: page.viewport().height };
+  }
+  async captchaAction(action) {
+    const page = this.captchaPage;
+    if (!page || page.isClosed()) throw new Error('Окно CAPTCHA уже недоступно.');
+    const { type, x, y, value } = action;
+    if (['move', 'down', 'up', 'click', 'scroll'].includes(type)) {
+      const { width, height } = page.viewport();
+      if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x > width || y > height) throw new Error('Некорректные координаты.');
+      await page.mouse.move(x, y);
+      if (type === 'down') await page.mouse.down();
+      if (type === 'up') await page.mouse.up();
+      if (type === 'click') await page.mouse.click(x, y);
+      if (type === 'scroll') await page.mouse.wheel({ deltaY: Math.max(-600, Math.min(600, Number(value) || 0)) });
+    } else if (type === 'text' && typeof value === 'string' && value.length <= 200) await page.keyboard.type(value);
+    else if (type === 'key' && ['Enter', 'Tab', 'Backspace', 'Escape', 'Space'].includes(value)) await page.keyboard.press(value);
+    else throw new Error('Недопустимое действие для CAPTCHA.');
   }
   async waitForSearchCards(page) {
     try {
@@ -111,6 +142,7 @@ class YandexBrowser {
     if (typeof hooks === 'function') hooks = { onCaptcha: hooks };
     const browser = await this.open(settings);
     const page = await browser.newPage();
+    if (process.platform === 'linux') await page.setViewport({ width: 1000, height: 720 });
     const collected = [];
     const deadline = Date.now() + Math.max(1, Number(settings.maxDurationMinutes) || 30) * 60000;
     try {
@@ -121,7 +153,7 @@ class YandexBrowser {
         const response = await this.navigate(page, url);
         if (response?.status() === 429) throw new CaptchaError('Яндекс вернул HTTP 429');
         if (response?.status() >= 400) throw new Error(`Яндекс вернул HTTP ${response.status()}`);
-        if (!(await this.waitForResults(page, settings, hooks.onCaptcha))) break;
+        if (!(await this.waitForResults(page, settings, hooks.onCaptcha, hooks))) break;
         if (!(await this.waitForSearchCards(page))) break;
         let rows;
         try {
@@ -159,6 +191,7 @@ class YandexBrowser {
       }
       return collected;
     } finally {
+      if (this.captchaPage === page) this.captchaPage = null;
       if (!page.isClosed()) {
         try { await page.close(); } catch (error) { this.log.debug({ error: error.message }, 'Страница уже закрыта браузером'); }
       }
@@ -201,6 +234,6 @@ class YandexBrowser {
     throw lastError;
   }
   async userAgent(settings) { const browser = await this.open(settings); return browser.userAgent(); }
-  async close() { const active = this.browser; this.browser = null; this.signature = null; if (active?.connected) await active.close(); }
+  async close() { const active = this.browser; this.browser = null; this.signature = null; this.captchaPage = null; if (active?.connected) await active.close(); }
 }
 module.exports = { YandexBrowser, CaptchaError, sleep, randomDelay, applySearchParams };

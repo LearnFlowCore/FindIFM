@@ -11,7 +11,7 @@ services:
       - key: OPEN_BROWSER
         value: "0"
       - key: CAPTCHA_STRATEGY
-        value: skip
+         value: manual
       - key: YANDEX_BROWSER_PATH
         value: /usr/bin/chromium
       - key: DATA_ROOT

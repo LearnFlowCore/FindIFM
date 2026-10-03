@@ -33,3 +33,26 @@ test('CAPTCHA при skip завершает поиск Яндекса ошиб�
   await assert.rejects(browser.waitForResults({}, { captchaStrategy: 'skip' }, () => { notified = true; }), CaptchaError);
   assert.equal(notified, true);
 });
+
+test('ручная CAPTCHA предоставляет изображение и ограничивает действия текущей страницей', async () => {
+  const browser = new YandexBrowser({}, {}, 'data');
+  const events = [];
+  browser.captchaPage = {
+    isClosed: () => false, viewport: () => ({ width: 1000, height: 720 }),
+    screenshot: async () => Buffer.from('image'),
+    mouse: { move: async (x, y) => events.push(['move', x, y]), down: async () => events.push(['down']), up: async () => events.push(['up']) },
+    keyboard: { type: async value => events.push(['text', value]), press: async value => events.push(['key', value]) },
+  };
+  const shot = await browser.captchaScreenshot();
+  assert.equal(shot.image, 'data:image/jpeg;base64,aW1hZ2U=');
+  assert.equal(shot.width, 1000);
+  await browser.captchaAction({ type: 'down', x: 80, y: 100 });
+  await browser.captchaAction({ type: 'up', x: 150, y: 100 });
+  await browser.captchaAction({ type: 'text', value: 'пример' });
+  await browser.captchaAction({ type: 'key', value: 'Enter' });
+  assert.deepEqual(events, [['move', 80, 100], ['down'], ['move', 150, 100], ['up'], ['text', 'пример'], ['key', 'Enter']]);
+  await assert.rejects(browser.captchaAction({ type: 'down', x: -1, y: 0 }), /координаты/);
+  await assert.rejects(browser.captchaAction({ type: 'key', value: 'Control+L' }), /Недопустимое/);
+  browser.captchaPage = null;
+  await assert.rejects(browser.captchaScreenshot(), /недоступно/);
+});

@@ -119,12 +119,14 @@ async function startServer(options = {}) {
   app.post('/api/search', requireBody, asyncRoute(async (req, res) => {
     const status = await checkInternet();
     if (!status.ok) { notify('failed', 'Поиск остановлен: нет интернет-соединения'); return res.status(503).json({ error: 'Нет интернет-соединения.' }); }
-    return res.status(202).json({ jobId: jobs.start(req.body) });
+    const jobId = jobs.start(req.body);
+    return res.status(202).json({ jobId, captchaToken: jobs.captchaToken(jobId) });
   }));
   app.post('/api/search/test', requireBody, rejectWhileBusy, asyncRoute(async (req, res) => {
     const status = await checkInternet();
     if (!status.ok) return res.status(503).json({ error: 'Нет интернет-соединения.' });
-    return res.status(202).json({ jobId: jobs.start({ ...req.body, quickTest: true }) });
+    const jobId = jobs.start({ ...req.body, quickTest: true });
+    return res.status(202).json({ jobId, captchaToken: jobs.captchaToken(jobId) });
   }));
   const jobStatus = (req, res) => {
     const job = jobs.get(req.params.id);
@@ -134,13 +136,23 @@ async function startServer(options = {}) {
   app.get('/api/jobs/:id', jobStatus);
   app.get('/api/jobs', (req, res) => res.json(jobs.list(req.query.status)));
   app.get('/api/jobs/:id/logs', (req, res) => res.json(jobs.logs(req.params.id, req.query.limit)));
+  const requireCaptchaAccess = (req, res, next) => jobs.canControlCaptcha(req.params.id, req.get('X-Captcha-Token'))
+    ? next() : res.status(403).json({ error: 'Нет доступа к активной CAPTCHA этой задачи.' });
+  app.get('/api/jobs/:id/captcha', requireCaptchaAccess, asyncRoute(async (_req, res) => {
+    res.set('Cache-Control', 'no-store').json(await browser.captchaScreenshot());
+  }));
+  app.post('/api/jobs/:id/captcha', requireBody, requireCaptchaAccess, asyncRoute(async (req, res) => {
+    await browser.captchaAction(req.body);
+    res.json({ ok: true });
+  }));
   app.post('/api/jobs/:id/stop', asyncRoute(async (req, res) => await jobs.stop(req.params.id)
     ? res.json({ ok: true }) : res.status(409).json({ error: 'Задачу нельзя остановить.' })));
   app.post('/api/jobs/:id/restart', asyncRoute(async (req, res) => {
     const previous = repo.historyById(req.params.id);
     if (!previous) return res.status(404).json({ error: 'Задание не найдено.' });
     const query = JSON.parse(previous.query_json);
-    return res.status(202).json({ jobId: jobs.start(query) });
+    const jobId = jobs.start(query);
+    return res.status(202).json({ jobId, captchaToken: jobs.captchaToken(jobId) });
   }));
   app.get('/api/results', (req, res) => res.json(repo.results({
     jobId: req.query.jobId, page: req.query.page, limit: req.query.limit || req.query.pageSize,
@@ -161,7 +173,8 @@ async function startServer(options = {}) {
     try { query = JSON.parse(previous.query_json); } catch { return res.status(409).json({ error: 'Параметры этого запуска повреждены.' }); }
     const status = await checkInternet();
     if (!status.ok) return res.status(503).json({ error: 'Нет интернет-соединения.' });
-    return res.status(202).json({ jobId: jobs.start(query) });
+    const jobId = jobs.start(query);
+    return res.status(202).json({ jobId, captchaToken: jobs.captchaToken(jobId) });
   }));
   app.delete('/api/history', rejectWhileBusy, (_req, res) => { repo.clearHistory(); res.status(204).end(); });
   app.delete('/api/results', rejectWhileBusy, (_req, res) => { repo.clearResults(); res.status(204).end(); });
@@ -187,7 +200,7 @@ async function startServer(options = {}) {
     if ('maxDurationMinutes' in values && (!Number.isInteger(values.maxDurationMinutes) || values.maxDurationMinutes < 1 || values.maxDurationMinutes > 240)) return res.status(400).json({ error: 'Лимит времени должен быть от 1 до 240 минут.' });
     if (values.browserPath && (path.basename(values.browserPath).toLowerCase() !== 'browser.exe' || !fs.existsSync(values.browserPath))) return res.status(400).json({ error: 'Укажите существующий browser.exe Яндекс Браузера.' });
     if (values.profileType && !['temporary', 'user'].includes(values.profileType)) return res.status(400).json({ error: 'Некорректный профиль.' });
-    if (values.captchaStrategy && !['stop', 'skip'].includes(values.captchaStrategy)) return res.status(400).json({ error: 'Некорректная стратегия капчи.' });
+    if (values.captchaStrategy && !['stop', 'skip', 'manual'].includes(values.captchaStrategy)) return res.status(400).json({ error: 'Некорректная стратегия капчи.' });
     repo.setSettings(values);
     return res.json(repo.settings());
   });
