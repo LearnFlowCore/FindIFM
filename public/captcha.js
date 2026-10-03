@@ -11,6 +11,10 @@
   let loading = false;
   let actions = Promise.resolve();
   let lastMove = 0;
+  function closeAfterSuccess() {
+    setHint('Яндекс принял ответ. Поиск продолжается в основной вкладке; это окно сейчас закроется.');
+    setTimeout(() => window.close(), 1200);
+  }
 
   const setHint = message => { $('hint').textContent = message; };
   function setStatus(message, kind = '') { $('status').textContent = message; $('status').className = `status ${kind}`; }
@@ -64,18 +68,20 @@
     if (!validJob || !waiting) return;
     try {
       const job = await request(`/api/jobs/${encodeURIComponent(jobId)}`);
+      if (!waiting) return;
       if (job.status === 'waiting_captcha') {
         setStatus('Ожидаем вашего ответа');
       } else if (['completed', 'cancelled', 'failed'].includes(job.status)) {
         waiting = false;
         sessionStorage.removeItem(storageKey);
         setStatus(job.status === 'completed' ? 'Поиск завершён' : job.status === 'cancelled' ? 'Поиск остановлен' : 'Ошибка поиска', job.status === 'failed' ? 'error' : 'done');
-        setHint(job.error || job.message || 'Откройте основную вкладку, чтобы посмотреть результат. Это окно можно закрыть.');
+        if (job.status === 'completed') closeAfterSuccess();
+        else setHint(job.error || job.message || 'Откройте основную вкладку, чтобы посмотреть результат.');
       } else if (job.status === 'running') {
         waiting = false;
         sessionStorage.removeItem(storageKey);
         setStatus('CAPTCHA пройдена ✓', 'done');
-        setHint('Яндекс принял ответ, поиск продолжается в основной вкладке. Это окно можно закрыть.');
+        closeAfterSuccess();
       }
     } catch (error) { setHint(`Нет связи с поиском: ${error.message}`); }
   }
