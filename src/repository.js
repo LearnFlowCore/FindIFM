@@ -2,7 +2,7 @@
 const DEFAULT_SETTINGS = {
   browserPath: '',
   profileType: 'temporary', profilePath: '', userAgent: 'Автоматический User-Agent браузера',
-  pageDelay: 2000, pageJitter: 500, resultDelay: 1000, resultJitter: 300,
+  pageDelay: 500, pageJitter: 150, resultDelay: 250, resultJitter: 100,
   maxPages: 5, maxResults: 500, maxDurationMinutes: 30, captchaStrategy: process.env.CAPTCHA_STRATEGY || 'stop', notifications: true,
   notifyOnFinish: true, notifyOnError: true, notifyOnNewData: true,
   telegramEnabled: false, telegramBotToken: '', telegramChatId: '',

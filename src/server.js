@@ -16,6 +16,28 @@ const { JobManager } = require('./jobs');
 const { NotificationService } = require('./notifications');
 const { exportXlsx, exportCsv, exportTxt } = require('./export');
 
+function highlightTerms(query) {
+  return [...new Set(String(query || '').split(/\s+/).map(word => word.trim()).filter(word => word.length > 1))].sort((a, b) => b.length - a.length).slice(0, 30);
+}
+
+function remoteUrlAllowed(value) {
+  let url;
+  try { url = new URL(value); } catch { return false; }
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return false;
+  const host = url.hostname.toLowerCase();
+  if (['localhost', 'localhost.localdomain'].includes(host) || host.endsWith('.localhost') || host === '::1') return false;
+  if (/^(10|127)\./.test(host) || /^169\.254\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)) return false;
+  return true;
+}
+
+function highlightedHtml(html, url, query) {
+  const terms = highlightTerms(query);
+  const payload = JSON.stringify(terms).replace(/<\//g, '<\\/');
+  const injection = `<base href="${String(url).replace(/"/g, '&quot;')}"><style>mark.signal-hit{background:#ffe66d;color:inherit;padding:0 .08em;border-radius:.16em;box-shadow:0 0 0 1px #f4c43055}</style><script>(function(){const terms=${payload};if(!terms.length)return;const pattern=new RegExp('('+terms.map(x=>x.replace(/[\\^$.*+?()[\\]{}|]/g,'\\\\$&')).join('|')+')','giu');const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);const nodes=[];while(walker.nextNode())if(!/^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|INPUT)$/i.test(walker.currentNode.parentElement?.tagName||''))nodes.push(walker.currentNode);for(const node of nodes){const value=node.nodeValue;if(!pattern.test(value)){pattern.lastIndex=0;continue}pattern.lastIndex=0;const fragment=document.createDocumentFragment();let last=0;value.replace(pattern,(hit,_,offset)=>{fragment.append(document.createTextNode(value.slice(last,offset)));const mark=document.createElement('mark');mark.className='signal-hit';mark.textContent=hit;fragment.append(mark);last=offset+hit.length;return hit});fragment.append(document.createTextNode(value.slice(last)));node.replaceWith(fragment)}})()</script>`;
+  if (/<body\b[^>]*>/i.test(html)) return html.replace(/<\/body>/i, `${injection}</body>`);
+  return `${injection}${html}`;
+}
+
 async function startServer(options = {}) {
   const config = createConfig(options);
   const exportRoot = path.join(config.dataRoot, 'exports');
@@ -52,9 +74,24 @@ async function startServer(options = {}) {
 
   const jobs = new JobManager(repo, provider, log, notify, checkInternet);
   const app = express();
+  const asyncRoute = handler => (req, res, next) => Promise.resolve(handler(req, res)).catch(next);
   app.disable('x-powered-by');
   app.use(express.json({ limit: config.requestLimit }));
   app.use(express.static(path.join(config.projectRoot, 'public')));
+  app.get('/highlight', asyncRoute(async (req, res) => {
+    const target = String(req.query.url || '');
+    if (!remoteUrlAllowed(target)) return res.status(400).send('Некорректная внешняя ссылка.');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const response = await fetch(target, { signal: controller.signal, headers: { 'User-Agent': 'Signal/1.0 page preview' } });
+      if (!response.ok) return res.status(502).send(`Сайт вернул HTTP ${response.status}.`);
+      const type = response.headers.get('content-type') || '';
+      if (!type.includes('text/html')) return res.redirect(target);
+      const html = (await response.text()).slice(0, 4_000_000);
+      res.set('Content-Type', 'text/html; charset=utf-8').send(highlightedHtml(html, target, req.query.q));
+    } finally { clearTimeout(timer); }
+  }));
   app.use('/api', (req, res, next) => {
     if (!token || req.get('X-App-Token') === token) return next();
     return res.status(401).json({ error: 'Недействительная сессия приложения.' });
@@ -64,7 +101,6 @@ async function startServer(options = {}) {
     return res.status(401).send('Недействительная сессия приложения.');
   }, express.static(exportRoot, { index: false, dotfiles: 'deny' }));
 
-  const asyncRoute = handler => (req, res, next) => Promise.resolve(handler(req, res)).catch(next);
   const requireBody = (req, res, next) => req.body && typeof req.body === 'object' && !Array.isArray(req.body)
     ? next() : res.status(400).json({ error: 'Ожидается JSON-объект.' });
   const rejectWhileBusy = (_req, res, next) => jobs.isBusy()
