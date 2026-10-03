@@ -81,45 +81,31 @@
   renderResults = () => { renderTableAndPreview(); renderPreview(); addHighlightActions(); };
   const renderMonitorBase = renderKeywordMonitor;
   function setStopVisible(visible) { $$('.stop-search-button').forEach(button => { button.hidden = !visible; if (!visible) { button.disabled = false; button.textContent = '■ Остановить поиск'; } }); }
-  let captchaLoading = false;
-  let captchaUpdatedAt = 0;
-  let captchaActions = Promise.resolve();
-  function captchaRequest(body) {
-    if (!state.captchaToken || !state.jobId) return Promise.reject(new Error('Доступ к CAPTCHA этой задачи недоступен. Запустите поиск заново.'));
-    const url = `/api/jobs/${encodeURIComponent(state.jobId)}/captcha`;
-    return api(url, { ...(body ? { method: 'POST', body: JSON.stringify(body) } : {}), headers: { 'X-Captcha-Token': state.captchaToken } });
-  }
-  function captchaAction(action) {
-    captchaActions = captchaActions.catch(() => {}).then(() => captchaRequest(action)).catch(error => { $('#captchaHint').textContent = error.message; });
-    return captchaActions;
-  }
   function setupCaptcha() {
     $('#settingsForm [name="captchaStrategy"]').insertAdjacentHTML('beforeend', '<option value="manual">Подтвердить вручную</option>');
     const panel = document.createElement('section');
     panel.id = 'captchaPanel'; panel.className = 'card captcha-panel'; panel.hidden = true;
-    panel.innerHTML = '<h3>Подтвердите, что вы человек — Яндекс</h3><p>Нажимайте на изображение как в браузере. Для ползунка удерживайте и перетащите его. После подтверждения поиск продолжится автоматически; время ожидания — 15 минут.</p><div class="captcha-screen"><img id="captchaImage" alt="Окно проверки Яндекса" draggable="false"></div><div class="captcha-controls"><input id="captchaText" type="text" placeholder="Текст с картинки, если нужен" aria-label="Текст CAPTCHA"><button type="button" class="button secondary" id="captchaType">Ввести текст</button><button type="button" class="button secondary" id="captchaEnter">Enter</button><button type="button" class="button secondary" id="captchaTab">Tab</button><button type="button" class="button secondary" id="captchaBackspace">⌫</button></div><p id="captchaHint" role="status">Загружаем окно проверки...</p>';
+    panel.innerHTML = '<h3>Яндекс просит подтвердить поиск</h3><p>Откройте проверку в отдельном окне. Там можно увеличить изображение, нажимать на него, перетаскивать ползунок и вводить текст. После ответа поиск продолжится автоматически (время ожидания — 15 минут).</p><button type="button" class="button primary" id="openCaptchaWindow">↗ Открыть CAPTCHA в отдельном окне</button><p id="captchaHint" role="status"></p>';
     $('#keywordMonitor').after(panel);
-    const image = $('#captchaImage');
-    const coordinates = event => { const bounds = image.getBoundingClientRect(); return { x: Math.round(Math.max(0, Math.min(image.naturalWidth, (event.clientX - bounds.left) * image.naturalWidth / bounds.width))), y: Math.round(Math.max(0, Math.min(image.naturalHeight, (event.clientY - bounds.top) * image.naturalHeight / bounds.height))) }; };
-    let dragging = false;
-    image.addEventListener('pointerdown', event => { if (!image.naturalWidth) return; event.preventDefault(); image.setPointerCapture(event.pointerId); dragging = true; captchaAction({ type: 'down', ...coordinates(event) }); });
-    image.addEventListener('pointermove', event => { if (dragging) captchaAction({ type: 'move', ...coordinates(event) }); });
-    image.addEventListener('pointerup', event => { if (!dragging) return; dragging = false; captchaAction({ type: 'up', ...coordinates(event) }); });
-    image.addEventListener('pointercancel', event => { if (!dragging) return; dragging = false; captchaAction({ type: 'up', ...coordinates(event) }); });
-    image.addEventListener('wheel', event => { event.preventDefault(); captchaAction({ type: 'scroll', ...coordinates(event), value: event.deltaY }); }, { passive: false });
-    $('#captchaType').addEventListener('click', async () => { const input = $('#captchaText'); if (!input.value) return; await captchaAction({ type: 'text', value: input.value }); input.value = ''; });
-    $('#captchaText').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); $('#captchaType').click(); } });
-    for (const [id, value] of [['captchaEnter', 'Enter'], ['captchaTab', 'Tab'], ['captchaBackspace', 'Backspace']]) $(`#${id}`).addEventListener('click', () => captchaAction({ type: 'key', value }));
+    $('#openCaptchaWindow').addEventListener('click', () => {
+      if (!state.captchaToken || !state.jobId) { $('#captchaHint').textContent = 'Доступ к проверке утрачен. Запустите новый поиск.'; return; }
+      const url = `/captcha.html?job=${encodeURIComponent(state.jobId)}`;
+      const popup = window.open(url, 'signal-yandex-captcha', 'popup=yes,width=1100,height=940,resizable=yes,scrollbars=yes');
+      if (!popup) { $('#captchaHint').textContent = 'Разрешите всплывающие окна для этого сайта и нажмите кнопку ещё раз.'; return; }
+      state.captchaWindow = popup;
+      popup.focus();
+      $('#captchaHint').textContent = 'Окно проверки открыто. Не закрывайте основную вкладку до завершения поиска.';
+    });
+    window.addEventListener('message', event => {
+      if (event.origin !== location.origin || event.source !== state.captchaWindow) return;
+      if (event.data?.type !== 'signal-captcha-ready' || event.data.jobId !== state.jobId || !state.captchaToken) return;
+      event.source.postMessage({ type: 'signal-captcha-access', jobId: state.jobId, token: state.captchaToken, appToken }, location.origin);
+    });
   }
   function renderCaptcha(job) {
     const panel = $('#captchaPanel');
     if (!panel) return;
     panel.hidden = job.status !== 'waiting_captcha';
-    if (panel.hidden || captchaLoading || Date.now() - captchaUpdatedAt < 1800) return;
-    captchaLoading = true; captchaUpdatedAt = Date.now();
-    captchaRequest().then(data => { if (!panel.hidden) { $('#captchaImage').src = data.image; $('#captchaHint').textContent = 'Окно обновляется автоматически. Когда проверка исчезнет, поиск продолжится.'; } })
-      .catch(error => { if (!panel.hidden) $('#captchaHint').textContent = error.message; })
-      .finally(() => { captchaLoading = false; });
   }
   renderKeywordMonitor = job => { renderMonitorBase(job); setStopVisible(['queued', 'running', 'waiting_captcha'].includes(job.status)); $('#monitorSearchPages').textContent = Number(job.searchPages || 0); };
   $('#copyResultLinks').addEventListener('click', async () => { const field = $('#resultLinksText'); if (!field.value) return notify('Нет ссылок для копирования', true); await navigator.clipboard.writeText(field.value); notify('Ссылки скопированы, каждая с новой строки'); });

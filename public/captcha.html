@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <title>Подтверждение Яндекса · Сигнал</title>
+  <link rel="stylesheet" href="captcha.css">
+</head>
+<body>
+  <header class="top">
+    <div><span class="brand">СИГНАЛ / ЯНДЕКС</span><h1>Подтвердите поиск</h1><p>Это изображение страницы Яндекса из браузера на Render. Нажимайте прямо по нему — действия передаются в поиск.</p></div>
+    <span id="status" class="status" role="status">Подключаемся...</span>
+  </header>
+  <main>
+    <div class="toolbar">
+      <button id="fit" type="button" aria-pressed="true">По ширине</button>
+      <button id="fullSize" type="button" aria-pressed="false">Оригинальный размер</button>
+      <button id="refresh" type="button">↻ Обновить изображение</button>
+      <span>Обновляется автоматически · для ползунка удерживайте и перетащите</span>
+    </div>
+    <div class="screen fit" id="screen"><img id="image" draggable="false" alt="Страница проверки Яндекса"></div>
+    <div class="controls">
+      <label for="answer">Текст с картинки (сначала нажмите на поле на изображении)</label>
+      <div class="action-row"><input id="answer" type="text" autocomplete="off" placeholder="Введите ответ здесь"><button id="type" type="button" class="primary">Ввести текст в Яндекс</button><button id="enter" type="button" class="primary">Нажать Enter</button></div>
+      <div class="action-row"><button id="tab" type="button">Tab — следующее поле</button><button id="backspace" type="button">⌫ Удалить символ</button><button id="scrollUp" type="button">↑ Прокрутить страницу</button><button id="scrollDown" type="button">↓ Прокрутить страницу</button></div>
+    </div>
+    <p id="hint" role="alert">Подождите, пока загрузится проверка. После успешного ответа поиск продолжится в основной вкладке автоматически.</p>
+  </main>
+  <script src="captcha.js"></script>
+</body>
+</html>

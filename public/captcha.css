@@ -1,0 +1,29 @@
+:root { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #172439; background: #eef3fa; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input { font: inherit; }
+button { border: 1px solid #bfcce0; border-radius: 9px; padding: 10px 14px; background: #fff; color: #203653; cursor: pointer; font-weight: 650; }
+button:hover { background: #e9f0fc; }
+button:focus-visible, input:focus-visible { outline: 3px solid #71a5ff; outline-offset: 2px; }
+button.primary { background: #245ecd; color: #fff; border-color: #245ecd; }
+button.primary:hover { background: #174ead; }
+button[aria-pressed="true"] { background: #dceaff; border-color: #3879e5; }
+.top { padding: 22px clamp(14px, 4vw, 42px); background: #fff; border-bottom: 1px solid #d9e2ef; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+.brand { color: #376cbd; font-weight: 800; font-size: 12px; letter-spacing: .14em; }
+h1 { margin: 5px 0; font-size: 27px; }
+.top p { color: #586781; margin: 5px 0 0; }
+.status { background: #fff1d4; color: #744c00; padding: 10px 14px; border-radius: 9px; font-weight: 700; }
+.status.done { background: #d9f7e8; color: #12633a; }
+.status.error { background: #ffe5e5; color: #9b2828; }
+main { padding: 18px clamp(14px, 4vw, 42px) 36px; }
+.toolbar, .action-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.toolbar { margin-bottom: 14px; }
+.toolbar span { color: #52647e; }
+.screen { background: #dce4ef; border: 1px solid #c8d4e5; border-radius: 10px; min-height: 260px; overflow: auto; }
+.screen img { display: block; width: 1000px; height: auto; max-width: none; touch-action: none; user-select: none; cursor: crosshair; }
+.screen.fit img { max-width: 100%; width: 1000px; }
+.controls { background: #fff; border-radius: 10px; margin-top: 15px; padding: 17px; display: grid; gap: 10px; }
+.controls label { font-weight: 700; }
+.controls input { min-width: 180px; flex: 1; padding: 10px; border: 1px solid #bfcce0; border-radius: 8px; }
+#hint { color: #455976; line-height: 1.5; }
+@media (max-width: 600px) { .top { align-items: flex-start; } .toolbar span { width: 100%; } .controls button { flex: 1 1 auto; } }

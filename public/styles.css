@@ -173,7 +173,3 @@ tbody tr:hover { background: #fffaf0; }
 .captcha-panel[hidden] { display: none !important; }
 .captcha-panel h3 { margin: 0 0 8px; }
 .captcha-panel p { color: #5b6780; }
-.captcha-screen { max-width: 100%; overflow: auto; background: #edf0f5; }
-.captcha-screen img { display: block; width: 100%; max-width: 1000px; height: auto; cursor: pointer; touch-action: none; user-select: none; }
-.captcha-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-.captcha-controls input { flex: 1 1 200px; min-width: 0; padding: 10px; border: 1px solid #d4ddeb; border-radius: 8px; }
