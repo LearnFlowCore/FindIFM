@@ -34,11 +34,15 @@ class JobManager {
         throw new Error('Нет интернет-соединения');
       }
        const settings = this.repo.settings();
+       // На Render браузер без интерфейса: ждать ручного ввода CAPTCHA нельзя.
+       if (process.platform === 'linux') settings.captchaStrategy = 'skip';
        if (query.quickTest) { settings.maxPages = 1; settings.maxResults = 5; settings.maxDurationMinutes = Math.min(settings.maxDurationMinutes, 5); query.deepPages = 0; }
       const { candidates, withinDuplicates } = await this.provider.search(query, settings, {
         isCancelled: () => Boolean(job.cancelled),
         onCaptcha: () => {
-          job.captcha = true; job.status = 'waiting_captcha'; job.message = 'Капча/блокировка: пройдите проверку в окне Яндекс Браузера';
+          job.captcha = true; job.status = 'waiting_captcha'; job.message = settings.captchaStrategy === 'skip'
+            ? 'Яндекс запросил CAPTCHA: поиск будет остановлен. На Render подтверждение недоступно.'
+            : 'Капча/блокировка: пройдите проверку в окне Яндекс Браузера';
           this.repo.updateTask(id, 'waiting_captcha', job.progress, job.message);
           this.repo.addTaskLog(id, 'warn', 'captcha', job.message);
           this.notify('captcha', job.message);
@@ -103,7 +107,8 @@ class JobManager {
          : /лимит|limit/i.test(reason) ? `Превышен лимит: ${reason}` : reason;
        Object.assign(job, { status: cancelled ? 'cancelled' : 'failed', error: cancelled ? null : readable, progress: 100 });
       this.repo.finishHistory(id, job.status, job.resultsCount, job.duplicatesCount, job.error);
-      this.repo.addTaskLog(id, cancelled ? 'info' : 'error', job.status, cancelled ? 'Задача остановлена' : job.error);
+       job.message = cancelled ? 'Поиск остановлен' : readable;
+       this.repo.addTaskLog(id, cancelled ? 'info' : 'error', job.status, cancelled ? 'Задача остановлена' : job.error);
       if (!cancelled) this.notify('failed', `Ошибка поиска «${query.original}»: ${job.error}`);
     } finally {
       this.running = false;

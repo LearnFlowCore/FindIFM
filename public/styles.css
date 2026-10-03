@@ -166,4 +166,6 @@ tbody tr:hover { background: #fffaf0; }
 .preview-panel .preview-controls input, .preview-panel .preview-controls select { padding: 9px 12px; border: 1px solid #d4ddeb; border-radius: 8px; background: white; }
 .preview-panel td { max-width: 380px; overflow-wrap: anywhere; }
 .monitor-timing { display: flex; justify-content: space-between; color: #59729a; font-size: 13px; margin-top: 8px; }
-#stopSearchButton { margin-top: 14px; }
+.stop-search-button { flex-shrink: 0; font-weight: 700; box-shadow: 0 3px 12px rgba(224,82,82,.18); }
+.stop-search-button[hidden] { display: none !important; }
+@media (max-width: 800px) { .stop-search-button { width: 100%; } }
