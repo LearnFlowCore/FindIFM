@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { applySearchParams } = require('../src/browser');
+const { applySearchParams, parseDuckDuckGoResults } = require('../src/browser');
 
 test('переносит запрос и ограничения в общую веб-выдачу', () => {
   const url = applySearchParams('https://yandex.ru/search/?type=news', {
@@ -24,4 +24,12 @@ test('создаёт отдельные URL страниц общего поис
 test('не принимает новостную вкладку и посторонние сайты', () => {
   assert.throws(() => applySearchParams('https://example.com/news', { yandexText: 'тест' }, 0), /общего поиска Яндекса/);
   assert.throws(() => applySearchParams('https://yandex.ru/news/search', { yandexText: 'тест' }, 0), /общего поиска Яндекса/);
+});
+
+test('разбирает резервную веб-выдачу без домена DuckDuckGo', () => {
+  const rows = parseDuckDuckGoResults('<a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.org%2Fnews&amp;rut=x">Заголовок</a><div class="result__snippet">Описание совпадения</div>');
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].url, 'https://example.org/news');
+  assert.equal(rows[0].title, 'Заголовок');
+  assert.equal(rows[0].searchType, 'fallback');
 });

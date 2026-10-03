@@ -7,6 +7,34 @@ const puppeteer = require('puppeteer-core');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const randomDelay = (base, jitter) => Math.max(0, base + Math.round((Math.random() * 2 - 1) * jitter));
 
+function decodeHtml(value) {
+  return String(value || '')
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+}
+
+function parseDuckDuckGoResults(html) {
+  const rows = [];
+  const pattern = /<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  let match;
+  while ((match = pattern.exec(String(html || '')))) {
+    const parsedHref = decodeHtml(match[1]);
+    let url;
+    try {
+      const link = new URL(parsedHref, 'https://html.duckduckgo.com');
+      url = link.searchParams.get('uddg') || link.toString();
+    } catch { continue; }
+    if (!/^https?:\/\//i.test(url) || /(^|\.)duckduckgo\.com$/i.test(new URL(url).hostname)) continue;
+    const start = match.index + match[0].length;
+    const tail = String(html).slice(start, start + 2500);
+    const snippetMatch = tail.match(/class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a|class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/div/i);
+    rows.push({ title: decodeHtml(match[2].replace(/<[^>]+>/g, '')), url, snippet: decodeHtml((snippetMatch?.[1] || snippetMatch?.[2] || '').replace(/<[^>]+>/g, '').trim()), dateText: '', searchType: 'fallback' });
+  }
+  return rows;
+}
+
 function applySearchParams(url, query, pageNumber) {
   const target = new URL(url, 'https://yandex.ru');
   if (!/(^|\.)yandex\.ru$/i.test(target.hostname) || target.pathname !== '/search/') throw new Error('Ожидается адрес общего поиска Яндекса.');
@@ -112,6 +140,7 @@ class YandexBrowser {
     const browser = await this.open(settings);
     const page = await browser.newPage();
     const collected = [];
+    let captchaDetected = false;
     const deadline = Date.now() + Math.max(1, Number(settings.maxDurationMinutes) || 30) * 60000;
     try {
       for (let number = 0; number < settings.maxPages; number += 1) {
@@ -121,7 +150,7 @@ class YandexBrowser {
         const response = await this.navigate(page, url);
         if (response?.status() === 429) throw new CaptchaError('Яндекс вернул HTTP 429');
         if (response?.status() >= 400) throw new Error(`Яндекс вернул HTTP ${response.status()}`);
-        if (!(await this.waitForResults(page, settings, hooks.onCaptcha))) break;
+        if (!(await this.waitForResults(page, settings, () => { captchaDetected = true; hooks.onCaptcha?.(); }))) break;
         if (!(await this.waitForSearchCards(page))) break;
         let rows;
         try {
@@ -157,12 +186,34 @@ class YandexBrowser {
         if (!rows.length) break;
         await sleep(randomDelay(settings.pageDelay, settings.pageJitter));
       }
+      if (!collected.length && captchaDetected && settings.captchaStrategy === 'skip') {
+        this.log.warn?.('Яндекс запросил CAPTCHA, используем резервную веб-выдачу');
+        return this.collectDuckDuckGo(query, settings, hooks);
+      }
       return collected;
     } finally {
       if (!page.isClosed()) {
         try { await page.close(); } catch (error) { this.log.debug({ error: error.message }, 'Страница уже закрыта браузером'); }
       }
     }
+  }
+  async collectDuckDuckGo(query, settings, hooks = {}) {
+    const collected = [];
+    const deadline = Date.now() + Math.max(1, Number(settings.maxDurationMinutes) || 30) * 60000;
+    const pages = Math.min(Number(settings.maxPages) || 1, 3);
+    for (let number = 0; number < pages && Date.now() < deadline; number += 1) {
+      const url = new URL('https://html.duckduckgo.com/html/');
+      url.searchParams.set('q', query.yandexText || query.text || query.original);
+      if (number) url.searchParams.set('s', String(number * 30));
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Резервная выдача вернула HTTP ${response.status}`);
+      const rows = parseDuckDuckGoResults(await response.text());
+      collected.push(...rows);
+      hooks.onCheckpoint?.(number + 1, collected.length);
+      if (!rows.length) break;
+      await sleep(randomDelay(settings.pageDelay, settings.pageJitter));
+    }
+    return collected;
   }
   async inspect(url, query, settings) {
     const browser = await this.open(settings);
@@ -203,4 +254,4 @@ class YandexBrowser {
   async userAgent(settings) { const browser = await this.open(settings); return browser.userAgent(); }
   async close() { const active = this.browser; this.browser = null; this.signature = null; if (active?.connected) await active.close(); }
 }
-module.exports = { YandexBrowser, CaptchaError, sleep, randomDelay, applySearchParams };
+module.exports = { YandexBrowser, CaptchaError, sleep, randomDelay, applySearchParams, parseDuckDuckGoResults };
