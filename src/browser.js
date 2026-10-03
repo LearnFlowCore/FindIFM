@@ -35,6 +35,22 @@ function parseDuckDuckGoResults(html) {
   return rows;
 }
 
+function parseBingResults(xml) {
+  const rows = [];
+  for (const item of String(xml || '').match(/<item>[\s\S]*?<\/item>/gi) || []) {
+    const value = name => item.match(new RegExp(`<${name}>([\\s\\S]*?)<\\/${name}>`, 'i'))?.[1] || '';
+    const url = decodeHtml(value('link').replace(/<!\[CDATA\[|\]\]>/g, '').trim()).replace(/^http:\/\//i, 'https://');
+    if (!/^https?:\/\//i.test(url)) continue;
+    rows.push({
+      title: decodeHtml(value('title').replace(/<!\[CDATA\[|\]\]>/g, '').replace(/<[^>]+>/g, '').trim()),
+      url,
+      snippet: decodeHtml(value('description').replace(/<!\[CDATA\[|\]\]>/g, '').replace(/<[^>]+>/g, '').trim()),
+      dateText: '', searchType: 'fallback',
+    });
+  }
+  return rows;
+}
+
 function applySearchParams(url, query, pageNumber) {
   const target = new URL(url, 'https://yandex.ru');
   if (!/(^|\.)yandex\.ru$/i.test(target.hostname) || target.pathname !== '/search/') throw new Error('Ожидается адрес общего поиска Яндекса.');
@@ -202,12 +218,21 @@ class YandexBrowser {
     const deadline = Date.now() + Math.max(1, Number(settings.maxDurationMinutes) || 30) * 60000;
     const pages = Math.min(Number(settings.maxPages) || 1, 3);
     for (let number = 0; number < pages && Date.now() < deadline; number += 1) {
-      const url = new URL('https://html.duckduckgo.com/html/');
-      url.searchParams.set('q', query.yandexText || query.text || query.original);
-      if (number) url.searchParams.set('s', String(number * 30));
-      const response = await fetch(url);
+      const text = query.yandexText || query.text || query.original;
+      const bingUrl = new URL('https://www.bing.com/search');
+      bingUrl.searchParams.set('format', 'rss');
+      bingUrl.searchParams.set('q', text);
+      const response = await fetch(bingUrl);
       if (!response.ok) throw new Error(`Резервная выдача вернула HTTP ${response.status}`);
-      const rows = parseDuckDuckGoResults(await response.text());
+      let rows = parseBingResults(await response.text());
+      if (!rows.length) {
+        const duckUrl = new URL('https://html.duckduckgo.com/html/');
+        duckUrl.searchParams.set('q', text);
+        if (number) duckUrl.searchParams.set('s', String(number * 30));
+        const duckResponse = await fetch(duckUrl);
+        if (!duckResponse.ok) throw new Error(`Резервная выдача вернула HTTP ${duckResponse.status}`);
+        rows = parseDuckDuckGoResults(await duckResponse.text());
+      }
       collected.push(...rows);
       hooks.onCheckpoint?.(number + 1, collected.length);
       if (!rows.length) break;
@@ -254,4 +279,4 @@ class YandexBrowser {
   async userAgent(settings) { const browser = await this.open(settings); return browser.userAgent(); }
   async close() { const active = this.browser; this.browser = null; this.signature = null; if (active?.connected) await active.close(); }
 }
-module.exports = { YandexBrowser, CaptchaError, sleep, randomDelay, applySearchParams, parseDuckDuckGoResults };
+module.exports = { YandexBrowser, CaptchaError, sleep, randomDelay, applySearchParams, parseDuckDuckGoResults, parseBingResults };

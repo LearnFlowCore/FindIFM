@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { applySearchParams, parseDuckDuckGoResults } = require('../src/browser');
+const { applySearchParams, parseDuckDuckGoResults, parseBingResults } = require('../src/browser');
 
 test('переносит запрос и ограничения в общую веб-выдачу', () => {
   const url = applySearchParams('https://yandex.ru/search/?type=news', {
@@ -31,5 +31,12 @@ test('разбирает резервную веб-выдачу без доме�
   assert.equal(rows.length, 1);
   assert.equal(rows[0].url, 'https://example.org/news');
   assert.equal(rows[0].title, 'Заголовок');
+  assert.equal(rows[0].searchType, 'fallback');
+});
+
+test('разбирает RSS резервной выдачи Bing', () => {
+  const rows = parseBingResults('<item><title>Заголовок</title><link>http://example.org/news</link><description>Описание</description></item>');
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].url, 'https://example.org/news');
   assert.equal(rows[0].searchType, 'fallback');
 });
