@@ -16,6 +16,7 @@ let shutdownPromise = null;
 let developmentWatchers = [];
 let reloadTimer = null;
 let updateTimer = null;
+const appIcon = path.resolve(__dirname, '..', 'build', 'icon.ico');
 
 function openExternal(url) {
   try {
@@ -52,7 +53,7 @@ async function createApplication() {
     port: 0,
     token,
     notify: message => {
-      if (Notification.isSupported()) new Notification({ title: 'Монитор упоминаний', body: message }).show();
+      if (Notification.isSupported()) new Notification({ title: 'Монитор упоминаний', body: message, icon: appIcon }).show();
     },
   });
 
@@ -64,6 +65,7 @@ async function createApplication() {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#f5f7fb',
+    icon: appIcon,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

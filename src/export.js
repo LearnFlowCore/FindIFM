@@ -13,6 +13,8 @@ async function exportXlsx(rows, filename) {
     { header: 'Описание', key: 'description', width: 55 }, { header: 'Статус', key: 'status', width: 25 },
     { header: 'Запрос', key: 'query', width: 30 }, { header: 'Дата поиска', key: 'search_date', width: 22 },
     { header: 'Дата запуска поиска', key: 'search_run_date', width: 22 },
+    { header: 'Категория', key: 'category', width: 22 }, { header: 'Длина текста', key: 'text_length', width: 15 },
+    { header: 'Есть медиа', key: 'has_media', width: 13 },
   ];
   sheet.addRows(rows);
   sheet.getRow(1).eachCell(cell => { cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF17324D' } }; });
@@ -21,7 +23,7 @@ async function exportXlsx(rows, filename) {
     if (index > 1 && index % 2 === 0) row.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F6F8' } }; });
     if (index > 1) row.getCell('url').value = { text: row.getCell('url').value, hyperlink: row.getCell('url').value };
   });
-  sheet.autoFilter = { from: 'A1', to: 'I1' };
+  sheet.autoFilter = { from: 'A1', to: 'L1' };
   await workbook.xlsx.writeFile(filename);
   return filename;
 }
@@ -54,4 +56,13 @@ function exportTxtToDownloads(rows) {
   const file = path.join(downloadsFolder(), 'FindIFM.txt');
   return exportTxt(rows, file);
 }
-module.exports = { exportXlsx, exportCsv, exportTxt, exportTxtToDownloads, downloadsFolder };
+function exportTxtSnapshot(rows, jobId = 'run') {
+  const folder = downloadsFolder();
+  const stamp = new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-');
+  const safeId = String(jobId).replace(/[^a-z0-9-]/gi, '').slice(0, 12) || 'run';
+  const file = path.join(folder, `FindIFM_${stamp}_${safeId}.txt`);
+  exportTxt(rows, file);
+  exportTxtToDownloads(rows);
+  return file;
+}
+module.exports = { exportXlsx, exportCsv, exportTxt, exportTxtToDownloads, exportTxtSnapshot, downloadsFolder };

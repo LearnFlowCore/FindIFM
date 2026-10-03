@@ -56,17 +56,17 @@ body{font-family:'Segoe UI',Arial,sans-serif}
 
 body { background: var(--bg); color: var(--ink); font-family: "Segoe UI", Arial, sans-serif; }
 .app-shell { background: radial-gradient(circle at 78% -10%, #fff9df 0, transparent 31rem), var(--bg); }
-.sidebar { width: 258px; padding: 30px 19px 24px; background: var(--navy); border-right: 1px solid rgba(255,255,255,.08); }
-.brand { padding: 0 12px 58px; font-size: 19px; letter-spacing: -.7px; }
+.sidebar { width: 196px; padding: 30px 12px 24px; background: var(--navy); border-right: 1px solid rgba(255,255,255,.08); }
+.brand { padding: 0 9px 58px; font-size: 17px; letter-spacing: -.7px; }
 .brand small { color: #82b5a7; letter-spacing: 2px; }
 .brand-mark { width: 34px; height: 34px; border-radius: 11px; background: #f1bd63; color: #19302d; box-shadow: 0 0 0 5px rgba(241,189,99,.12); }
 .nav-tabs { gap: 8px; }
-.nav-tab { padding: 13px 13px; border: 1px solid transparent; border-radius: 10px; color: #9eb5ad; }
+.nav-tab { padding: 13px 9px; gap: 9px; border: 1px solid transparent; border-radius: 10px; color: #9eb5ad; }
 .nav-tab:hover { background: rgba(255,255,255,.07); color: #fff; }
 .nav-tab.active { background: #274542; color: #fff; box-shadow: inset 3px 0 #f1bd63, 0 8px 20px rgba(0,0,0,.12); }
 .nav-count { background: #3a625c; color: #e9f5ed; }
 .sidebar-bottom { border-top-color: rgba(255,255,255,.12); }
-.main-content { max-width: 1510px; padding: 34px 5.5vw 78px; }
+.main-content { flex: 1; min-width: 0; max-width: none; padding: 34px clamp(18px, 2.5vw, 42px) 78px; }
 .topbar { margin-bottom: 54px; }
 .eyebrow, .workflow-kicker { color: var(--teal); font-weight: 800; }
 .topbar h1, .section-intro h2 { font-family: Georgia, "Times New Roman", serif; color: #17302c; letter-spacing: -.8px; }
@@ -112,7 +112,7 @@ tbody tr:hover { background: #fffaf0; }
 .date-export { border-radius: 15px; }
 
 @media (max-width: 800px) {
-  .sidebar { padding: 18px 15px 11px; }
+  .sidebar { width: 100%; padding: 18px 15px 11px; }
   .brand { padding-bottom: 22px; }
   .main-content { padding: 24px 15px 56px; }
   .topbar { margin-bottom: 38px; }
@@ -120,3 +120,50 @@ tbody tr:hover { background: #fffaf0; }
   .section-intro h2 { font-size: 23px; }
   .search-card { padding: 23px 18px; }
 }
+.advanced-search { margin: 24px 0; padding: 22px; background: #f8faf5; box-shadow: none; }
+.advanced-search .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 16px 0 0; }
+.result-filter-fields { grid-template-columns: repeat(5, minmax(135px, 1fr)); }
+#resultsView .table-wrap table { min-width: 1680px; table-layout: auto; }
+#resultsView td { min-width: 110px; max-width: none; white-space: normal; }
+#resultsView td:first-child { min-width: 320px; }
+.full-url { display: block; margin-top: 8px; color: #718078; font: 11px/1.45 ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+.full-description { min-width: 360px!important; line-height: 1.6; color: #40584f; overflow-wrap: anywhere; }
+.result-title { max-width: none; font-size: 13px; line-height: 1.45; }
+.admin-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr); gap: 16px; align-items: start; }
+.task-log { padding: 20px; position: sticky; top: 20px; }
+.task-log pre { max-height: 560px; overflow: auto; margin: 16px 0 0; padding: 15px; border-radius: 9px; background: #102421; color: #d8eee3; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.6 ui-monospace, Consolas, monospace; }
+.task-actions { display: flex; gap: 10px; }
+@media (max-width: 1000px) { .result-filter-fields { grid-template-columns: repeat(3, 1fr); } .admin-grid { grid-template-columns: 1fr; } .task-log { position: static; } }
+@media (max-width: 700px) { .advanced-search .form-grid, .result-filter-fields { grid-template-columns: 1fr; } }
+.keyword-monitor { margin: 18px 0; padding: 22px; overflow: hidden; }
+.keyword-monitor[hidden] { display: none; }
+.keyword-monitor-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.keyword-monitor-head h3 { margin: 4px 0 0; }
+.monitor-state { display: inline-flex; align-items: center; gap: 8px; color: #375aa8; font-weight: 700; }
+.monitor-state::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: #7898ce; }
+.keyword-monitor.scanning .monitor-state::before { background: #3c79f1; box-shadow: 0 0 0 0 rgba(60,121,241,.45); animation: monitor-pulse 1.6s infinite; }
+.monitor-query { font-weight: 700; font-size: 18px; margin: 18px 0 12px; overflow-wrap: anywhere; }
+.monitor-track { height: 8px; background: #e9effb; border-radius: 99px; overflow: hidden; }
+.monitor-track span { display: block; height: 100%; width: 0; background: linear-gradient(90deg,#3b73dc,#72b3ff); border-radius: inherit; transition: width .6s ease; }
+.keyword-monitor.scanning .monitor-track span { background-size: 200% 100%; animation: monitor-flow 2s linear infinite; }
+.monitor-stats { display: flex; gap: 28px; margin: 16px 0; }
+.monitor-stats div { display: flex; flex-direction: column; gap: 2px; }
+.monitor-stats strong { font-size: 28px; }
+.monitor-stats span, .monitor-current { color: #66758b; font-size: 13px; }
+.monitor-current { overflow-wrap: anywhere; margin-bottom: 12px; }
+.monitor-events { display: grid; gap: 5px; }
+.monitor-event { display: flex; gap: 12px; min-width: 0; padding: 7px 10px; background: #f6f8fd; border-radius: 7px; font-size: 12px; animation: monitor-appear .35s ease; }
+.monitor-event span:first-child { flex: 0 0 110px; color: #6c7b92; }
+.monitor-event.match span:first-child { color: #168568; font-weight: 700; }
+.monitor-event span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@keyframes monitor-pulse { 60% { box-shadow: 0 0 0 9px rgba(60,121,241,0); } }
+@keyframes monitor-flow { to { background-position: -200% 0; } }
+@keyframes monitor-appear { from { opacity: 0; transform: translateY(-5px); } }
+@media (prefers-reduced-motion: reduce) { .keyword-monitor *, .keyword-monitor *::before { animation: none !important; transition: none !important; } }
+.preview-panel { margin: 16px 0; padding: 18px; overflow: hidden; }
+.preview-panel .preview-controls { display: flex; gap: 12px; margin: 12px 0; }
+.preview-panel .preview-controls input { flex: 1; min-width: 120px; }
+.preview-panel .preview-controls input, .preview-panel .preview-controls select { padding: 9px 12px; border: 1px solid #d4ddeb; border-radius: 8px; background: white; }
+.preview-panel td { max-width: 380px; overflow-wrap: anywhere; }
+.monitor-timing { display: flex; justify-content: space-between; color: #59729a; font-size: 13px; margin-top: 8px; }
+#stopSearchButton { margin-top: 14px; }

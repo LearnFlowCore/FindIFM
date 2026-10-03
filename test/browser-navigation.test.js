@@ -30,32 +30,29 @@ test('evaluate повторяется после замены контекста
   assert.equal(attempts, 2);
 });
 
-test('ожидает появления карточек новостной выдачи', async () => {
+test('ожидает появления карточек веб-выдачи', async () => {
   const browser = new YandexBrowser({}, {}, '');
   let selector;
   const page = {
     isClosed: () => false,
     waitForSelector: async value => { selector = value; },
   };
-  await browser.waitForNewsCards(page);
-  assert.match(selector, /news-link-new_primary/);
+  await browser.waitForSearchCards(page);
+  assert.match(selector, /serp-item/);
   assert.match(selector, /OrganicTitle-Link/);
 });
 
-test('использует новостной тип поиска Яндекса, если вкладка скрыта', async () => {
+test('ищет на всех сайтах через общую выдачу Яндекса', async () => {
   const browser = new YandexBrowser({}, {}, '');
-  browser.evaluate = async () => '';
-  assert.equal(await browser.newsTabUrl({}), 'https://yandex.ru/search/?type=news');
-});
-
-test('не переводит резервный новостной поиск на Дзен', async () => {
-  const browser = new YandexBrowser({}, {}, '');
-  browser.evaluate = async () => 'https://dzen.ru/news/search?issue_tld=ru';
-  assert.equal(await browser.newsTabUrl({}), 'https://yandex.ru/search/?type=news');
+  const url = new URL(browser.searchUrl({ yandexText: 'ключевые слова' }, 1));
+  assert.equal(url.pathname, '/search/');
+  assert.equal(url.searchParams.get('type'), null);
+  assert.equal(url.searchParams.get('text'), 'ключевые слова');
+  assert.equal(url.searchParams.get('p'), '1');
 });
 
 test('не превращает тайм-аут карточек в ошибку задания', async () => {
   const browser = new YandexBrowser({}, { warn() {} }, '');
   const page = { isClosed: () => false, waitForSelector: async () => { throw new Error('TimeoutError: waiting'); } };
-  assert.equal(await browser.waitForNewsCards(page), true);
+  assert.equal(await browser.waitForSearchCards(page), true);
 });

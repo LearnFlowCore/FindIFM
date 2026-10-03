@@ -7,8 +7,9 @@ RUN apt-get update \
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
-COPY public ./public
-COPY src ./src
+# The image contains the complete project package. Local-only files are
+# excluded by .dockerignore (dependencies, data, logs and Windows output).
+COPY . .
 
 ENV NODE_ENV=production \
   HOST=0.0.0.0 \

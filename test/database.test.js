@@ -25,6 +25,8 @@ test('встроенный SQLite сохраняет настройки и оч�
     assert.equal(listed.groups[0].query, 'тест');
     assert.equal(listed.groups[0].count, 1);
     assert.equal(listed.groups[0].domains, 1);
+    assert.equal(repo.results({ domain: 'example.com' }).total, 1);
+    assert.equal(repo.results({ domain: '=ample.com' }).total, 0);
     assert.equal(repo.deleteResult(listed.rows[0].id), true);
     assert.equal(repo.results().total, 0);
     assert.equal(repo.history()[0].results_count, 0);

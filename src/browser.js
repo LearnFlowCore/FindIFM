@@ -9,13 +9,10 @@ const randomDelay = (base, jitter) => Math.max(0, base + Math.round((Math.random
 
 function applySearchParams(url, query, pageNumber) {
   const target = new URL(url, 'https://yandex.ru');
-  if (!/(^|\.)(yandex\.ru|dzen\.ru)$/i.test(target.hostname)) throw new Error('Вкладка «Новости» ведёт за пределы Яндекса и Дзена.');
+  if (!/(^|\.)yandex\.ru$/i.test(target.hostname) || target.pathname !== '/search/') throw new Error('Ожидается адрес общего поиска Яндекса.');
+  target.searchParams.delete('type');
   target.searchParams.set('text', query.yandexText);
   target.searchParams.set('p', String(pageNumber));
-  if (/(^|\.)dzen\.ru$/i.test(target.hostname)) {
-    target.searchParams.set('query', query.yandexText);
-    target.searchParams.set('type_filter', 'news');
-  }
   if (query.within) target.searchParams.set('within', query.within); else target.searchParams.delete('within');
   if (query.from && query.to) target.searchParams.set('date', `${query.from.replaceAll('-', '')}-${query.to.replaceAll('-', '')}`);
   else target.searchParams.delete('date');
@@ -74,29 +71,6 @@ class YandexBrowser {
     }
     throw lastError;
   }
-  async newsTabUrl(page) {
-    const href = await this.evaluate(page, () => {
-      const normalize = value => (value || '').replace(/\s+/g, ' ').trim().toLocaleLowerCase('ru-RU');
-      const links = [...document.querySelectorAll('a[href]')];
-      const isNewsTarget = link => {
-        try {
-          const target = new URL(link.href, location.href);
-          return /(^|\.)(yandex\.ru|dzen\.ru)$/i.test(target.hostname)
-            && (/news/i.test(target.pathname) || target.searchParams.get('type') === 'news');
-        } catch { return false; }
-      };
-      const tab = links.find(link => normalize(link.textContent) === 'новости' && isNewsTarget(link))
-        || links.find(link => normalize(link.textContent).includes('новости') && isNewsTarget(link));
-      return tab?.href || '';
-    });
-    // Вкладка иногда скрыта в интерфейсе. Параметр type=news оставляет поиск
-    // на Яндексе и не зависит от меняющейся разметки новостного агрегатора.
-    if (href) {
-      const target = new URL(href);
-      if (/(^|\.)yandex\.ru$/i.test(target.hostname)) return href;
-    }
-    return 'https://yandex.ru/search/?type=news';
-  }
   async isCaptcha(page) {
     const state = await this.evaluate(page, () => ({
       url: location.href, title: document.title,
@@ -112,13 +86,13 @@ class YandexBrowser {
     while (page && !page.isClosed() && await this.isCaptcha(page)) await sleep(2000);
     return true;
   }
-  async waitForNewsCards(page) {
+  async waitForSearchCards(page) {
     try {
-      await page.waitForSelector('a.news-link-new_primary[href],a[class*="InstoryList__title"][href],a[href*="/news/story/"],li.serp-item h2 a[href],li.serp-item h3 a[href],.OrganicTitle-Link[href],[class*="OrganicTitle"] a[href]', { timeout: 15000 });
+      await page.waitForSelector('li.serp-item,.Organic,[data-cid],.OrganicTitle-Link[href],[class*="OrganicTitle"] a[href],h2 a[href]', { timeout: 15000 });
       return true;
     } catch (error) {
       if (page.isClosed()) return false;
-      this.log.warn?.({ error: error.message }, 'Новостные карточки не появились до тайм-аута, продолжаем без падения задания');
+      this.log.warn?.({ url: page.url?.(), error: error.message }, 'Карточки веб-поиска не появились до тайм-аута');
       return true;
     }
   }
@@ -133,52 +107,36 @@ class YandexBrowser {
       return null;
     }
   }
-  async collect(query, settings, onCaptcha) {
+  async collect(query, settings, hooks = {}) {
+    if (typeof hooks === 'function') hooks = { onCaptcha: hooks };
     const browser = await this.open(settings);
     const page = await browser.newPage();
     const collected = [];
+    const deadline = Date.now() + Math.max(1, Number(settings.maxDurationMinutes) || 30) * 60000;
     try {
-      const initialResponse = await this.navigate(page, this.searchUrl(query));
-      if (initialResponse?.status() === 429) { await sleep(60000); throw new CaptchaError('Яндекс вернул HTTP 429'); }
-      if (!(await this.waitForResults(page, settings, onCaptcha))) return collected;
-      const newsTab = await this.newsTabUrl(page);
-
       for (let number = 0; number < settings.maxPages; number += 1) {
-        const url = applySearchParams(newsTab, query, number);
+        if (hooks.isCancelled?.()) break;
+        if (Date.now() >= deadline) { this.log.warn?.({ page: number }, 'Достигнут лимит времени поисковой задачи'); break; }
+        const url = this.searchUrl(query, number);
         const response = await this.navigate(page, url);
-        if (response?.status() === 429) { await sleep(60000); throw new CaptchaError('Яндекс вернул HTTP 429'); }
-        if (!(await this.waitForResults(page, settings, onCaptcha))) break;
-        if (!(await this.waitForNewsCards(page))) break;
+        if (response?.status() === 429) throw new CaptchaError('Яндекс вернул HTTP 429');
+        if (response?.status() >= 400) throw new Error(`Яндекс вернул HTTP ${response.status()}`);
+        if (!(await this.waitForResults(page, settings, hooks.onCaptcha))) break;
+        if (!(await this.waitForSearchCards(page))) break;
         let rows;
         try {
           rows = await this.evaluate(page, () => {
-           const storyLinks = [...document.querySelectorAll('a.news-link-new_primary[href],a[class*="InstoryList__title"][href],a[href*="/news/story/"]')];
-          if (storyLinks.length) {
-            return storyLinks.map(link => {
-              const node = link.closest('.news-search-content__block,[class*="InstoryList__content"]') || link.parentElement;
-              const date = node.querySelector('time,[class*="date"],[class*="time"]');
-               return {
-                 title: link.textContent.trim(), url: link.href,
-                 snippet: node.textContent.trim().slice(0, 2000),
-                 dateText: date?.textContent.trim() || '', searchType: 'news',
-               };
-            });
-          }
-          const selectors = [
-            'article.news-search-story', '.news-search-story', 'li.serp-item',
-            '.Organic', '[data-cid][class*="news"]', '[class*="NewsSearch"] article',
-          ];
-          const nodes = [...new Set(document.querySelectorAll(selectors.join(',')))];
-          return nodes.map(node => {
-             const link = node.querySelector('a[href][class*="title"],h2 a[href],h3 a[href],a.OrganicTitle-Link,[class*="OrganicTitle"] a[href]');
-            const snippet = node.querySelector('[class*="snippet"],[class*="text"],.OrganicTextContentSpan');
-            const date = node.querySelector('time,[class*="date"],[class*="time"]');
-            return link ? {
-              title: link.textContent.trim(), url: link.href,
-              snippet: snippet?.textContent.trim() || '', dateText: date?.textContent.trim() || '',
-              searchType: 'news',
-            } : null;
-          }).filter(Boolean);
+            const nodes = [...new Set(document.querySelectorAll('li.serp-item,.Organic,[data-cid][class*="organic"],article[class*="Organic"]'))];
+            return nodes.map(node => {
+              const link = node.querySelector('h2 a[href],h3 a[href],a.OrganicTitle-Link[href],[class*="OrganicTitle"] a[href]');
+              const snippet = node.querySelector('[class*="snippet"],[class*="Snippet"],.OrganicTextContentSpan');
+              const date = node.querySelector('time,[class*="date"],[class*="Date"]');
+              return link ? {
+                title: link.textContent.trim(), url: link.href,
+                snippet: snippet?.textContent.trim() || node.textContent.trim().slice(0, 2000),
+                dateText: date?.getAttribute('datetime') || date?.textContent.trim() || '', searchType: 'web',
+              } : null;
+            }).filter(Boolean);
           });
         } catch (error) {
           if (page.isClosed() || /execution context|detached frame|cannot find context/i.test(error.message || '')) {
@@ -187,7 +145,15 @@ class YandexBrowser {
           }
           throw error;
         }
+        if (!rows.length && number === 0) {
+          const state = await this.evaluate(page, () => ({ title: document.title, body: document.body?.innerText?.slice(0, 400) || '', url: location.href }));
+          if (!/ничего не нашлось|ничего не найдено|по вашему запросу ничего/i.test(state.body)) {
+            throw new Error(`Не удалось распознать веб-выдачу Яндекса: ${state.url} (${state.title})`);
+          }
+        }
         collected.push(...rows);
+        hooks.onCheckpoint?.(number + 1, collected.length);
+        if (collected.length >= (Number(settings.maxResults) || 500)) break;
         if (!rows.length) break;
         await sleep(randomDelay(settings.pageDelay, settings.pageJitter));
       }
@@ -207,34 +173,23 @@ class YandexBrowser {
       try {
         await sleep(randomDelay(settings.resultDelay, settings.resultJitter));
         const response = await this.navigate(page, url, 15000);
-        if (response?.status() >= 500) throw new Error(`HTTP ${response.status()}`);
-        if (/(^|\.)dzen\.ru$/i.test(new URL(url).hostname)) {
-          try {
-            await page.waitForSelector('a.news-story-block__link[href],a[class*="StoryHead"][href],a[class*="StorySourceLink"][href]', { timeout: 8000 });
-          } catch (error) {
-            if (!/timeout/i.test(error.message || '') || page.isClosed()) throw error;
-          }
-        }
+        if (response?.status() >= 400) throw new Error(`HTTP ${response.status()}`);
         return await this.evaluate(page, words => {
           const meta = selector => document.querySelector(selector)?.content || '';
           const title = meta('meta[property="og:title"]') || document.title;
           const date = meta('meta[property="article:published_time"]') || meta('meta[name="date"]') || document.querySelector('time[datetime]')?.dateTime || document.querySelector('time')?.textContent || '';
-          const candidates = [...document.querySelectorAll('p')].map(item => item.textContent.trim()).filter(item => item.length > 40);
+          const contentRoot = document.querySelector('article,main,[role="main"]') || document.body;
+          const candidates = [...(contentRoot?.querySelectorAll('p') || [])].map(item => item.textContent.trim()).filter(item => item.length > 40);
           const description = candidates.find(item => words.some(word => item.toLocaleLowerCase('ru-RU').includes(word))) || meta('meta[name="description"]') || candidates[0] || '';
-          const sourceSelectors = 'a.news-story-block__link[href],a[class*="StoryHead"][href],a[class*="StorySourceLink"][href]';
-          const seen = new Set();
-          const sources = [...document.querySelectorAll(sourceSelectors)].map(link => {
-            try {
-              const url = new URL(link.href, location.href);
-              if (!/^https?:$/.test(url.protocol) || /(^|\.)(dzen\.ru|yandex\.(ru|com))$/i.test(url.hostname)) return null;
-              url.hash = '';
-              const key = url.toString();
-              if (seen.has(key)) return null;
-              seen.add(key);
-              return { url: key, label: link.textContent.trim() };
-            } catch { return null; }
-          }).filter(Boolean);
-          return { title, dateText: date, description: description.slice(0, 300), text: document.body?.innerText || '', sources };
+          const text = contentRoot?.innerText || '';
+          const links = [...(contentRoot?.querySelectorAll('a[href]') || [])].slice(0, 300)
+            .map(link => link.href).filter(Boolean);
+          return {
+            title, dateText: date, description: description.slice(0, 2000), text,
+            textLength: text.length, category: meta('meta[property="article:section"]') || meta('meta[name="category"]'),
+            hasMedia: Boolean(document.querySelector('main img,article img,main video,article video,video')),
+            links,
+          };
         }, query.words);
       } catch (error) { lastError = error; }
       finally {

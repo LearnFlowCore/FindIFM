@@ -34,3 +34,16 @@ test('не усекает аббревиатуры при проверке ва�
   assert.equal(textMatches('РЦВДО «Пионер» открыл набор', query), true);
   assert.equal(textMatches('РЦВ «Пионер» открыл набор', query), false);
 });
+
+test('поддерживает настраиваемую точность совпадения', () => {
+  const any = parseQuery({ query: 'красный завод', matchMode: 'any' });
+  assert.equal(textMatches('Красный дом', any), true);
+  const strict = parseQuery({ query: 'новый завод', matchMode: 'strict' });
+  assert.equal(textMatches('нового завода', strict), false);
+  const exact = parseQuery({ query: 'кот', matchMode: 'exact' });
+  assert.equal(textMatches('скот', exact), false);
+});
+
+test('проверяет диапазон длины текста', () => {
+  assert.throws(() => parseQuery({ query: 'тест', minTextLength: 100, maxTextLength: 10 }), /Минимальная длина/);
+});

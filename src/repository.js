@@ -3,7 +3,11 @@ const DEFAULT_SETTINGS = {
   browserPath: '',
   profileType: 'temporary', profilePath: '', userAgent: 'Автоматический User-Agent браузера',
   pageDelay: 2000, pageJitter: 500, resultDelay: 1000, resultJitter: 300,
-  maxPages: 5, captchaStrategy: process.env.CAPTCHA_STRATEGY || 'stop', notifications: true,
+  maxPages: 5, maxResults: 500, maxDurationMinutes: 30, captchaStrategy: process.env.CAPTCHA_STRATEGY || 'stop', notifications: true,
+  notifyOnFinish: true, notifyOnError: true, notifyOnNewData: true,
+  telegramEnabled: false, telegramBotToken: '', telegramChatId: '',
+  emailEnabled: false, emailHost: '', emailPort: 587, emailSecure: false,
+  emailUser: '', emailPassword: '', emailFrom: '', emailTo: '',
   exportFolder: 'exports', showUnknownDate: true,
 };
 
@@ -12,20 +16,28 @@ class Repository {
   addHistory(jobId, query) {
     this.db.prepare(`INSERT INTO search_history
       (job_id,query,query_json,extracted_date,period,date_from,date_to,whitelist,blacklist,timestamp,status)
-      VALUES (?,?,?,?,?,?,?,?,?,datetime('now','localtime'),'running')`)
+      VALUES (?,?,?,?,?,?,?,?,?,datetime('now','localtime'),'queued')`)
       .run(jobId, query.original, JSON.stringify(query), query.extractedDate, query.period, query.from, query.to,
         JSON.stringify(query.whitelist), JSON.stringify(query.blacklist));
   }
   finishHistory(jobId, status, resultsCount = 0, duplicatesCount = 0, error = null) {
-    this.db.prepare('UPDATE search_history SET status=?,results_count=?,duplicates_count=?,error=? WHERE job_id=?')
+    this.db.prepare("UPDATE search_history SET status=?,results_count=?,duplicates_count=?,error=?,progress=100,finished_at=datetime('now','localtime'),updated_at=datetime('now','localtime') WHERE job_id=?")
       .run(status, resultsCount, duplicatesCount, error, jobId);
   }
+  updateTask(jobId, status, progress, message = null) {
+    this.db.prepare("UPDATE search_history SET status=?,progress=?,message=?,started_at=CASE WHEN ?='running' AND started_at IS NULL THEN datetime('now','localtime') ELSE started_at END,updated_at=datetime('now','localtime') WHERE job_id=?").run(status, progress, message, status, jobId);
+  }
+  addTaskLog(jobId, level, event, message, context = null) {
+    this.db.prepare('INSERT INTO task_logs(job_id,level,event,message,context_json) VALUES(?,?,?,?,?)').run(jobId, level, event, message, context ? JSON.stringify(context) : null);
+  }
+  taskLogs(jobId, limit = 200) { return this.db.prepare('SELECT * FROM task_logs WHERE job_id=? ORDER BY id DESC LIMIT ?').all(jobId, Math.min(500, Math.max(1, Number(limit) || 200))).reverse(); }
+  tasks({ status } = {}) { return status ? this.db.prepare('SELECT * FROM search_history WHERE status=? ORDER BY id DESC LIMIT 200').all(status) : this.db.prepare('SELECT * FROM search_history ORDER BY id DESC LIMIT 200').all(); }
   hasUrl(url) { return Boolean(this.db.prepare('SELECT 1 FROM results WHERE url_normalized=? LIMIT 1').get(url)); }
   addResults(jobId, rows) {
     const statement = this.db.prepare(`INSERT INTO results
-      (job_id,url,url_normalized,domain,title,date,description,query,search_date,search_run_date,status,snippet_match)
-      VALUES (@jobId,@url,@urlNormalized,@domain,@title,@date,@description,@query,@searchDate,@searchRunDate,@status,@snippetMatch)`);
-    this.db.transaction(items => items.forEach(item => statement.run({ jobId, ...item })))(rows);
+      (job_id,url,url_normalized,domain,title,date,description,query,search_date,search_run_date,status,snippet_match,category,text_length,has_media)
+      VALUES (@jobId,@url,@urlNormalized,@domain,@title,@date,@description,@query,@searchDate,@searchRunDate,@status,@snippetMatch,@category,@textLength,@hasMedia)`);
+    this.db.transaction(items => items.forEach(item => statement.run({ jobId, ...item, category: item.category || '', textLength: Number(item.textLength || 0), hasMedia: Number(item.hasMedia || 0) })))(rows);
   }
   results(options = {}) {
     const page = Math.max(1, Number(options.page) || 1);
@@ -36,9 +48,21 @@ class Repository {
     if (options.jobId) { where.push('job_id=?'); args.push(options.jobId); }
     if (options.includeUnknownDate === false || options.undefinedDate === false) where.push("date IS NOT NULL AND date<>''");
     if (options.status) { where.push('status=?'); args.push(options.status); }
-    if (options.domain) { where.push('domain LIKE ?'); args.push(`%${options.domain}%`); }
+    if (options.domain) {
+      const exact = String(options.domain).startsWith('=');
+      const domain = String(options.domain).replace(/^=/, '').replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0].toLowerCase();
+      if (exact) { where.push('domain=?'); args.push(domain); }
+      else { where.push('(domain=? OR domain LIKE ?)'); args.push(domain, `%.${domain}`); }
+    }
     if (options.dateFrom) { where.push('date IS NOT NULL AND date>=?'); args.push(options.dateFrom); }
     if (options.dateTo) { where.push('date IS NOT NULL AND date<=?'); args.push(options.dateTo); }
+    if (options.category) { where.push('category LIKE ?'); args.push(`%${options.category}%`); }
+    if (options.minTextLength) { where.push('text_length>=?'); args.push(Number(options.minTextLength)); }
+    if (options.maxTextLength) { where.push('text_length<=?'); args.push(Number(options.maxTextLength)); }
+    if (options.hasMedia === true) where.push('has_media=1');
+    if (options.hasMedia === false) where.push('has_media=0');
+    for (const word of String(options.includeKeywords || '').split(',').map(x => x.trim()).filter(Boolean)) { where.push('(title LIKE ? OR description LIKE ?)'); args.push(`%${word}%`, `%${word}%`); }
+    for (const word of String(options.excludeKeywords || '').split(',').map(x => x.trim()).filter(Boolean)) { where.push('(title NOT LIKE ? AND description NOT LIKE ?)'); args.push(`%${word}%`, `%${word}%`); }
     if (options.q) { where.push('(title LIKE ? OR url LIKE ? OR domain LIKE ? OR description LIKE ? OR query LIKE ?)'); args.push(...Array(5).fill(`%${options.q}%`)); }
     const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const total = this.db.prepare(`SELECT COUNT(*) AS count FROM results ${clause}`).get(...args).count;
@@ -96,6 +120,6 @@ class Repository {
   }
   clearResults() { this.db.prepare('DELETE FROM results').run(); }
   clearHistory() { this.db.transaction(() => { this.db.prepare('DELETE FROM results').run(); this.db.prepare('DELETE FROM search_history').run(); })(); }
-  interruptRunning() { this.db.prepare("UPDATE search_history SET status='interrupted',error='Приложение было закрыто' WHERE status='running'").run(); }
+  interruptRunning() { this.db.prepare("UPDATE search_history SET status='interrupted',error='Приложение было закрыто' WHERE status IN ('running','waiting_captcha','stopping','queued')").run(); }
 }
 module.exports = { Repository, DEFAULT_SETTINGS };

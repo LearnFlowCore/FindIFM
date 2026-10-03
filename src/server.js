@@ -13,6 +13,7 @@ const { Repository } = require('./repository');
 const { YandexBrowser } = require('./browser');
 const { YandexHTMLProvider } = require('./search/provider');
 const { JobManager } = require('./jobs');
+const { NotificationService } = require('./notifications');
 const { exportXlsx, exportCsv, exportTxt } = require('./export');
 
 async function startServer(options = {}) {
@@ -45,11 +46,9 @@ async function startServer(options = {}) {
     });
   }
 
-  function notify(message) {
-    if (repo.settings().notifications === false) return;
-    if (options.notify) options.notify(message);
-    else notifier.notify({ title: 'Монитор упоминаний', message });
-  }
+  const desktopNotify = message => options.notify ? options.notify(message) : notifier.notify({ title: 'Монитор упоминаний', message });
+  const notifications = new NotificationService(repo, desktopNotify, log);
+  const notify = (event, message) => { notifications.send(event, message).catch(error => log.warn({ error: error.message }, 'Ошибка уведомления')); };
 
   const jobs = new JobManager(repo, provider, log, notify, checkInternet);
   const app = express();
@@ -83,8 +82,13 @@ async function startServer(options = {}) {
   }));
   app.post('/api/search', requireBody, asyncRoute(async (req, res) => {
     const status = await checkInternet();
-    if (!status.ok) { notify('Поиск остановлен: нет интернет-соединения'); return res.status(503).json({ error: 'Нет интернет-соединения.' }); }
+    if (!status.ok) { notify('failed', 'Поиск остановлен: нет интернет-соединения'); return res.status(503).json({ error: 'Нет интернет-соединения.' }); }
     return res.status(202).json({ jobId: jobs.start(req.body) });
+  }));
+  app.post('/api/search/test', requireBody, rejectWhileBusy, asyncRoute(async (req, res) => {
+    const status = await checkInternet();
+    if (!status.ok) return res.status(503).json({ error: 'Нет интернет-соединения.' });
+    return res.status(202).json({ jobId: jobs.start({ ...req.body, quickTest: true }) });
   }));
   const jobStatus = (req, res) => {
     const job = jobs.get(req.params.id);
@@ -92,10 +96,23 @@ async function startServer(options = {}) {
   };
   app.get('/api/search/:id', jobStatus);
   app.get('/api/jobs/:id', jobStatus);
+  app.get('/api/jobs', (req, res) => res.json(jobs.list(req.query.status)));
+  app.get('/api/jobs/:id/logs', (req, res) => res.json(jobs.logs(req.params.id, req.query.limit)));
+  app.post('/api/jobs/:id/stop', asyncRoute(async (req, res) => await jobs.stop(req.params.id)
+    ? res.json({ ok: true }) : res.status(409).json({ error: 'Задачу нельзя остановить.' })));
+  app.post('/api/jobs/:id/restart', asyncRoute(async (req, res) => {
+    const previous = repo.historyById(req.params.id);
+    if (!previous) return res.status(404).json({ error: 'Задание не найдено.' });
+    const query = JSON.parse(previous.query_json);
+    return res.status(202).json({ jobId: jobs.start(query) });
+  }));
   app.get('/api/results', (req, res) => res.json(repo.results({
     jobId: req.query.jobId, page: req.query.page, limit: req.query.limit || req.query.pageSize,
     sort: req.query.sort, order: req.query.order, q: req.query.q, status: req.query.status,
-    domain: req.query.domain, dateFrom: req.query.dateFrom, dateTo: req.query.dateTo,
+    domain: req.query.domain, dateFrom: req.query.dateFrom, dateTo: req.query.dateTo, category: req.query.category,
+    minTextLength: req.query.minTextLength, maxTextLength: req.query.maxTextLength,
+    hasMedia: req.query.hasMedia === 'present' ? true : req.query.hasMedia === 'absent' ? false : undefined,
+    includeKeywords: req.query.includeKeywords, excludeKeywords: req.query.excludeKeywords,
     includeUnknownDate: req.query.includeUnknownDate !== 'false' && req.query.undefinedDate !== 'false',
   })));
   app.delete('/api/results/:id', rejectWhileBusy, (req, res) => repo.deleteResult(req.params.id)
@@ -117,14 +134,21 @@ async function startServer(options = {}) {
     ? res.status(201).json(repo.savePreset(req.body)) : res.status(400).json({ error: 'Укажите название.' }));
   app.put('/api/presets/:name', requireBody, (req, res) => res.json(repo.savePreset({ ...req.body, name: req.body.name || req.params.name }, req.params.name)));
   app.delete('/api/presets/:name', (req, res) => { repo.deletePreset(req.params.name); res.status(204).end(); });
-  app.get('/api/settings', (_req, res) => res.json(repo.settings()));
+  app.get('/api/settings', (_req, res) => {
+    const settings = repo.settings();
+    res.json({ ...settings, telegramBotToken: '', emailPassword: '', telegramTokenConfigured: Boolean(settings.telegramBotToken), emailPasswordConfigured: Boolean(settings.emailPassword) });
+  });
   app.put('/api/settings', requireBody, (req, res) => {
-    const allowed = ['browserPath', 'profileType', 'profilePath', 'pageDelay', 'pageJitter', 'resultDelay', 'resultJitter', 'maxPages', 'captchaStrategy', 'notifications', 'showUnknownDate'];
+    const allowed = ['browserPath', 'profileType', 'profilePath', 'pageDelay', 'pageJitter', 'resultDelay', 'resultJitter', 'maxPages', 'maxResults', 'maxDurationMinutes', 'captchaStrategy', 'notifications', 'showUnknownDate', 'notifyOnFinish', 'notifyOnError', 'notifyOnNewData', 'telegramEnabled', 'telegramBotToken', 'telegramChatId', 'emailEnabled', 'emailHost', 'emailPort', 'emailSecure', 'emailUser', 'emailPassword', 'emailFrom', 'emailTo'];
     const values = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowed.includes(key)));
+    if (!values.telegramBotToken) delete values.telegramBotToken;
+    if (!values.emailPassword) delete values.emailPassword;
     for (const key of ['pageDelay', 'pageJitter', 'resultDelay', 'resultJitter']) {
       if (key in values && (!Number.isFinite(values[key]) || values[key] < 0 || values[key] > 300000)) return res.status(400).json({ error: `Некорректное значение ${key}` });
     }
     if ('maxPages' in values && (!Number.isInteger(values.maxPages) || values.maxPages < 1 || values.maxPages > 100)) return res.status(400).json({ error: 'Количество страниц должно быть от 1 до 100.' });
+    if ('maxResults' in values && (!Number.isInteger(values.maxResults) || values.maxResults < 1 || values.maxResults > 5000)) return res.status(400).json({ error: 'Лимит результатов должен быть от 1 до 5000.' });
+    if ('maxDurationMinutes' in values && (!Number.isInteger(values.maxDurationMinutes) || values.maxDurationMinutes < 1 || values.maxDurationMinutes > 240)) return res.status(400).json({ error: 'Лимит времени должен быть от 1 до 240 минут.' });
     if (values.browserPath && (path.basename(values.browserPath).toLowerCase() !== 'browser.exe' || !fs.existsSync(values.browserPath))) return res.status(400).json({ error: 'Укажите существующий browser.exe Яндекс Браузера.' });
     if (values.profileType && !['temporary', 'user'].includes(values.profileType)) return res.status(400).json({ error: 'Некорректный профиль.' });
     if (values.captchaStrategy && !['stop', 'skip'].includes(values.captchaStrategy)) return res.status(400).json({ error: 'Некорректная стратегия капчи.' });
@@ -139,7 +163,7 @@ async function startServer(options = {}) {
     const filename = `results_${stamp}.xlsx`;
     const file = path.join(exportRoot, filename);
     await exportXlsx(rows, file);
-    notify(`Файл сохранён: ${file}`);
+     notify('completed', `Файл сохранён: ${file}`);
     return { file: filename, url: `/exports/${encodeURIComponent(filename)}${token ? `?token=${encodeURIComponent(token)}` : ''}` };
   }
   app.post('/api/export', requireBody, asyncRoute(async (req, res) => res.json(await makeExport(req.body.scope || 'current', req.body.jobId))));
@@ -148,7 +172,7 @@ async function startServer(options = {}) {
     const filename = 'FindIFM.txt';
     const file = path.join(exportRoot, filename);
     exportTxt(rows, file);
-    notify(`TXT сохранён: ${rows.length} ссылок`);
+    notify('completed', `TXT сохранён: ${rows.length} ссылок`);
     return res.json({ file: filename, count: rows.length,
       url: `/exports/${encodeURIComponent(filename)}${token ? `?token=${encodeURIComponent(token)}` : ''}` });
   }));
@@ -160,7 +184,7 @@ async function startServer(options = {}) {
     const xlsx = `${base}.xlsx`; const csv = `${base}.csv`;
     await exportXlsx(selection.rows, path.join(exportRoot, xlsx));
     exportCsv(selection.rows, path.join(exportRoot, csv));
-    notify(`Выгрузка по дате запроса сохранена: ${selection.rows.length} ссылок`);
+    notify('completed', `Выгрузка по дате запроса сохранена: ${selection.rows.length} ссылок`);
     const link = file => `/exports/${encodeURIComponent(file)}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
     return res.json({ query: selection.query, extractedDate: selection.extractedDate, from: selection.from, to: selection.to,
       rows: selection.rows, count: selection.rows.length, xlsx: { file: xlsx, url: link(xlsx) }, csv: { file: csv, url: link(csv) } });
