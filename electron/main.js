@@ -6,7 +6,7 @@ const { app, BrowserWindow, Notification, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const { startServer } = require('../src/server');
 
-app.setName('Mention Monitor');
+app.setName('Сигнал');
 const hasLock = app.requestSingleInstanceLock();
 if (!hasLock) app.quit();
 
@@ -31,11 +31,11 @@ function setupAutoUpdater() {
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.on('update-available', info => {
     console.log(`Доступно обновление ${info.version}, загрузка началась`);
-    if (Notification.isSupported()) new Notification({ title: 'Монитор упоминаний', body: `Доступно обновление ${info.version}. Оно будет установлено после перезапуска.` }).show();
+    if (Notification.isSupported()) new Notification({ title: 'Сигнал', body: `Доступно обновление ${info.version}. Оно будет установлено после перезапуска.` }).show();
   });
   autoUpdater.on('update-downloaded', info => {
     const notification = Notification.isSupported()
-      ? new Notification({ title: 'Монитор упоминаний', body: `Обновление ${info.version} загружено. Перезапустите приложение для установки.` })
+      ? new Notification({ title: 'Сигнал', body: `Обновление ${info.version} загружено. Перезапустите приложение для установки.` })
       : null;
     notification?.on('click', () => autoUpdater.quitAndInstall());
   });
@@ -53,7 +53,7 @@ async function createApplication() {
     port: 0,
     token,
     notify: message => {
-      if (Notification.isSupported()) new Notification({ title: 'Монитор упоминаний', body: message, icon: appIcon }).show();
+      if (Notification.isSupported()) new Notification({ title: 'Сигнал', body: message, icon: appIcon }).show();
     },
   });
 

@@ -1,8 +1,8 @@
 {
-  "name": "mention-monitor-node",
+  "name": "signal-monitor",
   "version": "1.0.0",
-  "description": "Локальный монитор упоминаний в новостной выдаче Яндекса",
-  "author": "Mention Monitor",
+  "description": "Сигнал — монитор упоминаний в веб-выдаче Яндекса",
+  "author": "Сигнал",
   "private": true,
   "type": "commonjs",
   "main": "electron/main.js",
@@ -34,9 +34,9 @@
     "electron-builder": "26.15.3"
   },
   "build": {
-    "appId": "ru.local.mentionmonitor",
-    "productName": "Монитор упоминаний",
-    "artifactName": "Mention-Monitor-Setup-${version}.${ext}",
+    "appId": "ru.signal.monitor",
+    "productName": "Сигнал",
+    "artifactName": "Signal-Setup-${version}.${ext}",
     "asar": true,
     "asarUnpack": [
       "node_modules/node-notifier/vendor/**/*"

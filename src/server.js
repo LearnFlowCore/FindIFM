@@ -46,7 +46,7 @@ async function startServer(options = {}) {
     });
   }
 
-  const desktopNotify = message => options.notify ? options.notify(message) : notifier.notify({ title: 'Монитор упоминаний', message });
+  const desktopNotify = message => options.notify ? options.notify(message) : notifier.notify({ title: 'Сигнал', message });
   const notifications = new NotificationService(repo, desktopNotify, log);
   const notify = (event, message) => { notifications.send(event, message).catch(error => log.warn({ error: error.message }, 'Ошибка уведомления')); };
 

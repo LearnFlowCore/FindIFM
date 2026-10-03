@@ -28,7 +28,7 @@ class NotificationService {
       host: settings.emailHost, port: Number(settings.emailPort) || 587, secure: Boolean(settings.emailSecure),
       auth: settings.emailUser ? { user: settings.emailUser, pass: settings.emailPassword } : undefined,
     });
-    await transport.sendMail({ from: settings.emailFrom || settings.emailUser, to: settings.emailTo, subject: 'Монитор упоминаний', text: message });
+    await transport.sendMail({ from: settings.emailFrom || settings.emailUser, to: settings.emailTo, subject: 'Сигнал', text: message });
   }
 }
 
