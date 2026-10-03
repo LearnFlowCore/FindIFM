@@ -47,6 +47,7 @@
   </div>
   <div class="modal-backdrop" id="modal" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><button class="modal-close" id="closeModal" aria-label="Закрыть">×</button><h3 id="modalTitle">Новый пресет</h3><form id="presetForm"><label class="field"><span>Название</span><input name="name" required placeholder="Например, СМИ" /></label><label class="field"><span>Тип списка</span><select name="type"><option value="whitelist">Только эти домены</option><option value="blacklist">Исключить домены</option></select></label><label class="field"><span>Домены</span><textarea name="domains" required rows="5" placeholder="habr.com\nvc.ru"></textarea></label><div class="modal-actions"><button class="button secondary" type="button" id="cancelModal">Отмена</button><button class="button primary" type="submit">Сохранить</button></div></form></div></div>
   <div class="toast-stack" id="toasts" aria-live="polite"></div>
+  <script src="saved.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

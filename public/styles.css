@@ -173,3 +173,22 @@ tbody tr:hover { background: #fffaf0; }
 .captcha-panel[hidden] { display: none !important; }
 .captcha-panel h3 { margin: 0 0 8px; }
 .captcha-panel p { color: #5b6780; }
+.saved-runs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; margin-bottom: 18px; }
+.saved-group { padding: 18px; }
+.saved-group h3 { margin: 0 0 14px; overflow-wrap: anywhere; }
+.saved-group h3 span { display: block; margin-top: 5px; color: #65758b; font-size: 13px; font-weight: 500; }
+.saved-run { display: flex; align-items: center; gap: 8px; width: 100%; padding: 11px; border: 1px solid #e2e9f4; border-radius: 8px; background: #fff; color: #263c60; text-align: left; cursor: pointer; margin-top: 6px; }
+.saved-run span:last-child { margin-left: auto; white-space: nowrap; }
+.saved-run.selected { border-color: #3778e2; background: #edf4ff; }
+.saved-run:hover { border-color: #3778e2; }
+.saved-details { padding: 20px; }
+.saved-details[hidden] { display: none !important; }
+.saved-details-head, .saved-actions, .saved-pages { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.saved-details-head { justify-content: space-between; margin-bottom: 14px; }
+.saved-details-head h3 { margin: 0 0 4px; overflow-wrap: anywhere; }
+.saved-details-head p { margin: 0; color: #65758b; }
+.saved-details td { max-width: 440px; overflow-wrap: anywhere; }
+.saved-url { display: block; color: #65758b; overflow-wrap: anywhere; }
+.saved-pages { justify-content: center; padding-top: 16px; }
+.saved-pages button { padding: 8px 14px; border: 1px solid #d4ddeb; border-radius: 8px; background: #fff; cursor: pointer; }
+.saved-pages button:disabled { opacity: .5; cursor: default; }
