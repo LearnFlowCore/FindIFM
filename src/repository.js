@@ -85,6 +85,17 @@ class Repository {
   }
   history() { return this.db.prepare('SELECT * FROM search_history ORDER BY id DESC').all(); }
   historyById(value) { return this.db.prepare('SELECT * FROM search_history WHERE id=? OR job_id=?').get(value, value); }
+  updateAnalytics(jobId, values) {
+    const columns = { spikeAt: 'spike_at', notifiedAt: 'notified_at', responseAt: 'response_at' };
+    const entries = Object.entries(values).filter(([key]) => columns[key]);
+    if (!entries.length) return this.historyById(jobId);
+    this.db.prepare(`UPDATE search_history SET ${entries.map(([key]) => `${columns[key]}=?`).join(',')},updated_at=datetime('now','localtime') WHERE job_id=?`)
+      .run(...entries.map(([, value]) => value), jobId);
+    return this.historyById(jobId);
+  }
+  analyticsSummary(jobId) {
+    return this.db.prepare('SELECT COUNT(*) AS publications, COUNT(DISTINCT domain) AS sources FROM results WHERE job_id=?').get(jobId);
+  }
   presets() { return this.db.prepare('SELECT * FROM domain_presets ORDER BY name').all(); }
   savePreset(preset, oldName = null) {
     const domains = Array.isArray(preset.domains) ? preset.domains : [...(preset.whitelist || []), ...(preset.blacklist || [])];

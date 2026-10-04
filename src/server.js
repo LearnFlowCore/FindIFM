@@ -166,6 +166,28 @@ async function startServer(options = {}) {
   app.delete('/api/results/:id', rejectWhileBusy, (req, res) => repo.deleteResult(req.params.id)
     ? res.status(204).end() : res.status(404).json({ error: 'Результат не найден.' }));
   app.get('/api/history', (_req, res) => res.json(repo.history()));
+  app.get('/api/analytics/:id', (req, res) => {
+    const run = repo.historyById(req.params.id);
+    if (!run) return res.status(404).json({ error: 'Поисковый запуск не найден.' });
+    const { metrics } = require('./analytics');
+    return res.json({ jobId: run.job_id, query: run.query, status: run.status, resultsCount: run.results_count,
+      sourcesCount: repo.analyticsSummary(run.job_id).sources,
+      spikeAt: run.spike_at, notifiedAt: run.notified_at, responseAt: run.response_at, ...metrics({ spikeAt: run.spike_at, notifiedAt: run.notified_at, responseAt: run.response_at }) });
+  });
+  app.put('/api/analytics/:id', requireBody, (req, res) => {
+    const run = repo.historyById(req.params.id);
+    if (!run) return res.status(404).json({ error: 'Поисковый запуск не найден.' });
+    const { parseEventTimes, metrics } = require('./analytics');
+    const changes = parseEventTimes(req.body);
+    if (!Object.keys(changes).length) return res.status(400).json({ error: 'Укажите время всплеска, уведомления или реакции.' });
+    const merged = { spikeAt: run.spike_at, notifiedAt: run.notified_at, responseAt: run.response_at, ...changes };
+    if (merged.spikeAt && merged.notifiedAt && Date.parse(merged.notifiedAt) < Date.parse(merged.spikeAt)) return res.status(400).json({ error: 'Уведомление не может предшествовать всплеску.' });
+    if (merged.notifiedAt && merged.responseAt && Date.parse(merged.responseAt) < Date.parse(merged.notifiedAt)) return res.status(400).json({ error: 'Реакция не может предшествовать уведомлению.' });
+    repo.updateAnalytics(run.job_id, changes);
+    return res.json({ jobId: run.job_id, query: run.query, status: run.status, resultsCount: run.results_count,
+      sourcesCount: repo.analyticsSummary(run.job_id).sources,
+      ...merged, ...metrics(merged) });
+  });
   app.post('/api/history/:id/rerun', asyncRoute(async (req, res) => {
     const previous = repo.historyById(req.params.id);
     if (!previous) return res.status(404).json({ error: 'Запись истории не найдена.' });

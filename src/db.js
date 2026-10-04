@@ -43,7 +43,8 @@ function openDatabase(file) {
       extracted_date TEXT, period TEXT, date_from TEXT, date_to TEXT,
       whitelist TEXT, blacklist TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
       results_count INTEGER DEFAULT 0, duplicates_count INTEGER DEFAULT 0, status TEXT, error TEXT,
-      progress INTEGER DEFAULT 0, message TEXT, started_at TEXT, finished_at TEXT, updated_at TEXT
+      progress INTEGER DEFAULT 0, message TEXT, started_at TEXT, finished_at TEXT, updated_at TEXT,
+      spike_at TEXT, notified_at TEXT, response_at TEXT
     );
     CREATE TABLE IF NOT EXISTS domain_presets (
       id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL, type TEXT DEFAULT 'whitelist', domains TEXT NOT NULL
@@ -63,6 +64,7 @@ function openDatabase(file) {
     whitelist: 'TEXT', blacklist: 'TEXT', timestamp: 'TEXT', results_count: 'INTEGER DEFAULT 0',
     duplicates_count: 'INTEGER DEFAULT 0', error: 'TEXT', progress: 'INTEGER DEFAULT 0',
     message: 'TEXT', started_at: 'TEXT', finished_at: 'TEXT', updated_at: 'TEXT',
+    spike_at: 'TEXT', notified_at: 'TEXT', response_at: 'TEXT',
   });
   addMissingColumns(db, 'domain_presets', { type: "TEXT DEFAULT 'whitelist'", domains: "TEXT DEFAULT '[]'" });
   return db;
