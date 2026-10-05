@@ -91,7 +91,7 @@
           renderResults();
         }
         notify(job.textFile ? `Поиск завершен. TXT сохранён: ${job.textFile}` : 'Поиск завершен');
-        await loadResults(); await saveCompletedJob(job);
+        await loadResults(); await loadHistory(); await saveCompletedJob(job);
         if (state.tab === 'search') show('results');
         return;
       }
@@ -113,7 +113,7 @@
   }
   async function loadResults() { if (state.previewActive) return; const request = ++state.resultsRequest; const params = new URLSearchParams({ page: state.page, limit: state.pageSize, sort: state.sort, order: state.order, q: $('#tableSearch').value.trim(), domain: $('#domainFilter')?.value.trim() || '', status: $('#statusFilter')?.value || '', dateFrom: $('#dateFromFilter')?.value || '', dateTo: $('#dateToFilter')?.value || '', category: $('#categoryFilter')?.value.trim() || '', minTextLength: $('#minLengthFilter')?.value || '', maxTextLength: $('#maxLengthFilter')?.value || '', hasMedia: $('#mediaFilter')?.value || '', includeKeywords: $('#includeFilter')?.value.trim() || '', excludeKeywords: $('#excludeFilter')?.value.trim() || '', includeUnknownDate: $('#unknownDate').checked ? 'true' : 'false' }); if (state.jobId) params.set('jobId', state.jobId); try { const data = await api(`/api/results?${params}`); if (request !== state.resultsRequest || state.previewActive) return; state.results = data.rows || []; state.resultGroups = data.groups || []; state.summary = data.summary || {}; state.total = Number(data.total || 0); renderResults(); } catch (e) { if (request === state.resultsRequest) notify(e.message, true); } }
   function renderResults() { const rows = state.results; const summary = state.summary || {}; const linkCount = Number(summary.publications ?? state.total ?? 0); $('#resultCount').textContent = linkCount; $('#resultsEmpty').hidden = rows.length > 0; $('#resultsSummary').textContent = linkCount ? `Найдено ссылок: ${linkCount}. СМИ: ${Number(summary.media || 0)}${summary.date_from || summary.date_to ? ` · период ${summary.date_from || 'начало'} — ${summary.date_to || 'сегодня'}` : ''}` : 'По заданным ключевым словам публикации не найдены'; const summaries = state.resultGroups.map(group => `<tr class="result-group"><td colspan="7"><strong>Ключевое упоминание: ${escape(group.query || 'Без запроса')}</strong><span>${Number(group.count || 0)} публикаций · ${Number(group.domains || 0)} сайтов</span></td></tr>`).join(''); const items = rows.map(row => `<tr><td><a class="result-title" href="${escape(row.url)}" target="_blank" rel="noopener">${escape(row.title || 'Открыть публикацию')}</a><span class="domain"><a href="${escape(row.url)}" target="_blank" rel="noopener">${escape(row.url)}</a></span></td><td class="domain">${escape(row.domain)}</td><td class="date">${escape(row.date || 'Не определена')}</td><td><span class="description">${escape(row.description)}</span></td><td><span class="pill ${row.status === 'новый' ? 'pending' : row.status === 'уже найден ранее' ? 'failed' : 'success'}">${escape(row.status || 'новый')}</span></td><td class="domain">${escape(row.query || '')}</td><td><button class="mini-button delete" data-delete-result="${escape(row.id)}">Удалить</button></td></tr>`).join(''); $('#resultsBody').innerHTML = summaries + items; $('#pageInfo').textContent = `${linkCount} результатов`; const pages = Math.max(1, Math.ceil(state.total / state.pageSize)); const first = Math.max(1, Math.min(state.page - 3, pages - 6)); $('#pagination').innerHTML = Array.from({ length: Math.min(pages, 7) }, (_, i) => first + i).map(page => `<button class="page-button ${page === state.page ? 'active' : ''}" data-page="${page}">${page}</button>`).join(''); }
-  async function loadHistory() { try { const data = await api('/api/history'); state.history = Array.isArray(data) ? data : []; renderHistory(); } catch (e) { notify(e.message, true); } }
+  async function loadHistory() { try { const data = await api('/api/history'); state.history = Array.isArray(data) ? data : []; updateQuerySuggestions(); renderHistory(); } catch (e) { notify(e.message, true); } }
   function renderHistory() { $('#historyEmpty').hidden = state.history.length > 0; $('#historyBody').innerHTML = state.history.map(row => `<tr><td><strong>${escape(row.query || 'Без запроса')}</strong><span class="domain">${escape(row.job_id)}</span></td><td>${escape(row.period || 'Без ограничений')}<br><span class="date">${escape(row.date_from || '')} ${row.date_to ? '— ' + escape(row.date_to) : ''}</span></td><td class="date">${escape(date(row.timestamp))}</td><td>${Number(row.results_count || 0)} <span class="domain">дубли: ${Number(row.duplicates_count || 0)}</span></td><td><span class="pill ${row.status === 'completed' ? 'success' : row.status === 'failed' ? 'failed' : 'pending'}">${escape(row.status)}</span></td><td><button class="mini-button" data-rerun="${escape(row.id)}">Повторить</button></td></tr>`).join(''); }
   async function rerun(id) { try { const result = await api(`/api/history/${encodeURIComponent(id)}/rerun`, { method: 'POST', body: '{}' }); state.jobId = result.jobId; window.dispatchEvent(new CustomEvent('signal-job-selected', { detail: { jobId: result.jobId } })); state.captchaToken = result.captchaToken; notify('Повторный поиск запущен'); show('search'); await pollJob(result.jobId); } catch (e) { notify(e.message, true); } }
   async function loadPresets() { try { const data = await api('/api/presets'); state.presets = Array.isArray(data) ? data : []; $('#presetSelect').innerHTML = '<option value="">Без пресета</option>' + state.presets.map(p => `<option value="${escape(p.name)}">${escape(p.name)} (${escape(p.type)})</option>`).join(''); $('#presetsList').innerHTML = state.presets.map(p => { const domains = JSON.parse(p.domains || '[]'); return `<div class="preset-row"><div><span class="preset-name">${escape(p.name)}</span><span class="preset-domains">${escape(domains.join(' · ') || 'Нет доменов')}</span></div><div class="preset-actions"><button class="mini-button" data-edit-preset="${escape(p.name)}">Изменить</button><button class="mini-button delete" data-delete-preset="${escape(p.name)}">Удалить</button></div></div>`; }).join('') || '<p class="description">Пресетов пока нет.</p>'; } catch (e) { notify(e.message, true); } }
@@ -222,6 +222,7 @@
   async function loadSavedArchive() {
     try {
       state.saved = await SignalSaved.list();
+      updateQuerySuggestions();
       $('#savedCount').textContent = state.saved.length;
       renderSavedArchive();
     } catch (error) { notify(error.message, true); }
@@ -253,6 +254,22 @@
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a'); link.href = url; link.download = filename; document.body.append(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+  const queryInput = $('#searchForm input[name="query"]');
+  const querySuggestions = document.createElement('datalist');
+  querySuggestions.id = 'previousSearches';
+  queryInput.setAttribute('list', querySuggestions.id);
+  queryInput.after(querySuggestions);
+  queryInput.addEventListener('focus', updateQuerySuggestions);
+  function updateQuerySuggestions() {
+    const seen = new Set();
+    const queries = [...state.history, ...state.saved].map(run => String(run.query || '').trim())
+      .filter(query => { const key = query.toLocaleLowerCase('ru-RU'); if (!key || seen.has(key)) return false; seen.add(key); return true; })
+      .slice(0, 40);
+    querySuggestions.replaceChildren(...queries.map(query => {
+      const option = document.createElement('option'); option.value = query;
+      return option;
+    }));
   }
   async function saveCompletedJob(job) {
     if (!Array.isArray(job.results)) return;
