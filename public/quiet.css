@@ -15,3 +15,12 @@
 .nav-icon { display: none; }
 .nav-tab { gap: 8px; }
 @media (max-width: 800px) { #resultsView .result-actions-group { margin-left: 0; width: 100%; } #resultsView .result-actions-group .inline-actions { justify-content: flex-start; } }
+#searchView .keyword-monitor, #searchView .analytics-panel { width: 100%; max-width: 960px; margin: 0 0 18px; }
+#searchView .analytics-panel { overflow: hidden; }
+#searchView .analytics-chart { width: min(100%, 680px); margin: 14px 0; padding: 10px 12px 6px; overflow: hidden; }
+#searchView .analytics-chart svg { width: 100%; max-width: 620px; max-height: 145px; margin: 6px auto; }
+#searchView .analytics-metrics { gap: 10px; }
+#searchView .analytics-metric { padding: 12px; }
+#searchView .analytics-metric strong { font-size: 22px; }
+#searchView .analytics-note { max-width: 680px; }
+@media (max-width: 650px) { #searchView .keyword-monitor-head, #searchView .monitor-stats { flex-wrap: wrap; } }

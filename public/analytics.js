@@ -40,7 +40,7 @@
     </form>
     <div class="analytics-quick"><button type="button" data-mark-event="spikeAt" class="mini-button">Всплеск сейчас</button><button type="button" data-mark-event="notifiedAt" class="mini-button">Уведомлено сейчас</button><button type="button" data-mark-event="responseAt" class="mini-button">Реакция сейчас</button></div>
     <p id="analyticsMessage" role="status"></p>`;
-  document.querySelector('#resultsView .section-intro').after(panel);
+  document.querySelector('#captchaPanel').after(panel);
   const $ = selector => panel.querySelector(selector);
   const form = $('#analyticsForm');
   let selected = null;
