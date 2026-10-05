@@ -21,6 +21,21 @@ function applySearchParams(url, query, pageNumber) {
 
 class CaptchaError extends Error { constructor(message = 'Яндекс запросил капчу') { super(message); this.name = 'CaptchaError'; } }
 
+// Выполняется в контексте страницы Яндекса (включая её фреймы).
+function cookieConsentButton(accept = false) {
+  const buttons = document.querySelectorAll('button,input[type="button"],input[type="submit"],[role="button"]');
+  for (const button of buttons) {
+    const label = (button.textContent || button.value || '').trim().replace(/\s+/g, ' ');
+    if (!/^(принять( все)?|принимаю|согласен|согласна|разрешить( все)?|accept( all)?|allow all|agree|i agree)$/i.test(label)) continue;
+    const container = button.closest('[role="dialog"],[class*="cookie" i],[id*="cookie" i],[class*="consent" i],[id*="consent" i]');
+    const context = container?.innerText || button.parentElement?.parentElement?.innerText || '';
+    if (!/cookie|куки|файл[а-я-]* cookie/i.test(context) || !button.getClientRects().length) continue;
+    if (accept) button.click();
+    return label;
+  }
+  return null;
+}
+
 class YandexBrowser {
   constructor(config, logger, dataRoot) {
     this.config = config; this.log = logger; this.dataRoot = dataRoot;
@@ -99,12 +114,26 @@ class YandexBrowser {
     const page = this.captchaPage;
     if (!page || page.isClosed()) throw new Error('Окно CAPTCHA уже недоступно.');
     const image = await page.screenshot({ type: 'jpeg', quality: 70 });
-    return { image: `data:image/jpeg;base64,${image.toString('base64')}`, width: page.viewport().width, height: page.viewport().height };
+    return { image: `data:image/jpeg;base64,${image.toString('base64')}`, width: page.viewport().width, height: page.viewport().height,
+      cookieConsent: await this.captchaCookieConsent() };
+  }
+  async captchaCookieConsent(accept = false) {
+    const page = this.captchaPage;
+    if (!page || page.isClosed()) throw new Error('Окно CAPTCHA уже недоступно.');
+    for (const frame of page.frames?.() || []) {
+      try {
+        const label = await frame.evaluate(cookieConsentButton, accept);
+        if (label) return { label };
+      } catch (error) { this.log.warn?.({ error: error.message }, 'Не удалось прочитать окно cookie Яндекса'); }
+    }
+    if (accept) throw new Error('Окно согласия на cookie больше не найдено. Обновите изображение CAPTCHA.');
+    return null;
   }
   async captchaAction(action) {
     const page = this.captchaPage;
     if (!page || page.isClosed()) throw new Error('Окно CAPTCHA уже недоступно.');
     const { type, x, y, value } = action;
+    if (type === 'accept_cookies') { await this.captchaCookieConsent(true); return; }
     if (['move', 'down', 'up', 'click', 'scroll'].includes(type)) {
       const { width, height } = page.viewport();
       if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x > width || y > height) throw new Error('Некорректные координаты.');

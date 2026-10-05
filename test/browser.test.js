@@ -56,3 +56,32 @@ test('ручная CAPTCHA предоставляет изображение и 
   browser.captchaPage = null;
   await assert.rejects(browser.captchaScreenshot(), /недоступно/);
 });
+
+test('окно cookie Яндекса показывается над CAPTCHA и принимает согласие только по действию пользователя', async () => {
+  const browser = new YandexBrowser({}, {}, 'data');
+  const originalDocument = global.document;
+  let clicked = 0;
+  const button = {
+    textContent: 'Принять все',
+    closest: () => ({ innerText: 'Мы используем cookie для работы сервиса.' }),
+    getClientRects: () => [{}],
+    click: () => { clicked += 1; },
+  };
+  global.document = { querySelectorAll: () => [button] };
+  browser.captchaPage = { isClosed: () => false, viewport: () => ({ width: 1000, height: 720 }),
+    screenshot: async () => Buffer.from('image'), frames: () => [{ evaluate: async (fn, accept) => fn(accept) }] };
+  try {
+    const shot = await browser.captchaScreenshot();
+    assert.deepEqual(shot.cookieConsent, { label: 'Принять все' });
+    assert.equal(clicked, 0);
+    await browser.captchaAction({ type: 'accept_cookies' });
+    assert.equal(clicked, 1);
+    button.closest = () => ({ innerText: 'Обычная проверка CAPTCHA' });
+    assert.equal((await browser.captchaScreenshot()).cookieConsent, null);
+    await assert.rejects(browser.captchaAction({ type: 'accept_cookies' }), /больше не найдено/);
+  } finally {
+    if (originalDocument === undefined) delete global.document;
+    else global.document = originalDocument;
+    browser.captchaPage = null;
+  }
+});

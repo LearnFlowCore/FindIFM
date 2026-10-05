@@ -226,17 +226,27 @@
     $('#settingsForm [name="captchaStrategy"]').insertAdjacentHTML('beforeend', '<option value="manual">Подтвердить вручную</option>');
     const panel = document.createElement('section');
     panel.id = 'captchaPanel'; panel.className = 'card captcha-panel'; panel.hidden = true;
-    panel.innerHTML = '<h3>Яндекс просит подтвердить поиск</h3><p>Откройте проверку в отдельном окне. Там есть пошаговые подсказки: можно нажимать на изображение, передвигать ползунок и вводить ответ. После подтверждения поиск продолжится автоматически (время ожидания — 15 минут).</p><button type="button" class="button primary" id="openCaptchaWindow">↗ Открыть проверку Яндекса</button><p id="captchaHint" role="status"></p>';
+    panel.innerHTML = '<h3>Яндекс ждёт подтверждения</h3><p>Нажмите кнопку и пройдите проверку в открывшемся окне. Поиск продолжится автоматически.</p><button type="button" class="button primary" id="openCaptchaWindow">↗ ПРОЙТИ CAPTCHA</button><p id="captchaHint" role="status"></p>';
     $('#keywordMonitor').after(panel);
-    $('#openCaptchaWindow').addEventListener('click', () => {
+    const warning = document.createElement('div');
+    warning.id = 'captchaWarning'; warning.className = 'captcha-warning'; warning.hidden = true;
+    warning.innerHTML = '<div class="captcha-warning-dialog" role="alertdialog" aria-modal="true" aria-labelledby="captchaWarningTitle" aria-describedby="captchaWarningText"><span class="captcha-warning-icon" aria-hidden="true">!</span><span class="captcha-warning-kicker">ПОИСК ПРИОСТАНОВЛЕН</span><h2 id="captchaWarningTitle">ПРОЙТИ CAPTCHA</h2><p id="captchaWarningText">Яндекс ждёт подтверждения. На ответ есть 15 минут.</p><div class="captcha-warning-actions"><button type="button" class="button primary" id="captchaWarningOpen">↗ ПРОЙТИ CAPTCHA</button><button type="button" class="button secondary" id="captchaWarningDismiss">Позже</button></div><p id="captchaWarningHint" role="status"></p></div>';
+    document.body.append(warning);
+    $('#captchaWarningDismiss').addEventListener('click', () => { warning.hidden = true; state.captchaWarningDismissed = state.jobId; });
+    function openCaptchaWindow() {
       if (!state.captchaToken || !state.jobId) { $('#captchaHint').textContent = 'Доступ к проверке утрачен. Запустите новый поиск.'; return; }
       const url = `/captcha.html?job=${encodeURIComponent(state.jobId)}`;
       const popup = window.open(url, 'signal-yandex-captcha', 'popup=yes,width=820,height=740,resizable=yes,scrollbars=yes');
-      if (!popup) { $('#captchaHint').textContent = 'Разрешите всплывающие окна для этого сайта и нажмите кнопку ещё раз.'; return; }
+      if (!popup) { $('#captchaHint').textContent = 'Разрешите всплывающие окна для этого сайта и нажмите кнопку ещё раз.'; $('#captchaWarningHint').textContent = $('#captchaHint').textContent; return; }
       state.captchaWindow = popup;
       popup.focus();
+      warning.hidden = true;
+      state.captchaWarningDismissed = state.jobId;
       $('#captchaHint').textContent = 'Окно проверки открыто. Не закрывайте основную вкладку до завершения поиска.';
-    });
+      $('#captchaWarningHint').textContent = $('#captchaHint').textContent;
+    }
+    $('#openCaptchaWindow').addEventListener('click', openCaptchaWindow);
+    $('#captchaWarningOpen').addEventListener('click', openCaptchaWindow);
     window.addEventListener('message', event => {
       if (event.origin !== location.origin || event.source !== state.captchaWindow) return;
       if (event.data?.type !== 'signal-captcha-ready' || event.data.jobId !== state.jobId || !state.captchaToken) return;
@@ -246,7 +256,22 @@
   function renderCaptcha(job) {
     const panel = $('#captchaPanel');
     if (!panel) return;
-    panel.hidden = job.status !== 'waiting_captcha';
+    const waiting = job.status === 'waiting_captcha';
+    panel.hidden = !waiting;
+    const warning = $('#captchaWarning');
+    if (waiting && state.captchaWarningJob !== job.id) {
+      state.captchaWarningJob = job.id;
+      state.captchaWarningDismissed = null;
+      state.captchaPreviousTitle = document.title;
+      $('#captchaWarningHint').textContent = '';
+      warning.hidden = false;
+      $('#captchaWarningOpen').focus();
+    }
+    if (waiting) document.title = '⚠ ПРОЙТИ CAPTCHA · Сигнал';
+    if (!waiting) {
+      warning.hidden = true;
+      if (state.captchaWarningJob) { document.title = state.captchaPreviousTitle || document.title; state.captchaWarningJob = null; }
+    } else if (state.captchaWarningDismissed !== job.id) warning.hidden = false;
   }
   renderKeywordMonitor = job => { renderMonitorBase(job); $('#monitorEta').textContent = $('#monitorEta').textContent.replace('ETA', 'Осталось'); setStopVisible(['queued', 'running', 'waiting_captcha'].includes(job.status)); $('#monitorSearchPages').textContent = Number(job.searchPages || 0); };
   $('#copyResultLinks').addEventListener('click', async () => { const field = $('#resultLinksText'); if (!field.value) return notify('Нет ссылок для копирования', true); await navigator.clipboard.writeText(field.value); notify('Ссылки скопированы, каждая с новой строки'); });
