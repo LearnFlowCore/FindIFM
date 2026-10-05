@@ -24,3 +24,29 @@
 #searchView .analytics-metric strong { font-size: 22px; }
 #searchView .analytics-note { max-width: 680px; }
 @media (max-width: 650px) { #searchView .keyword-monitor-head, #searchView .monitor-stats { flex-wrap: wrap; } }
+#resultsView.live-preview #resultsBody .pill { background: #fff0cc; color: #845c14; }
+.reputation-panel { width: 100%; max-width: 960px; margin: 0 0 18px; padding: 20px 22px; }
+.reputation-panel[hidden], .reputation-panel details[hidden] { display: none !important; }
+.reputation-head { display: flex; justify-content: space-between; align-items: start; gap: 16px; flex-wrap: wrap; }
+.reputation-head h3 { margin: 4px 0; font-size: 21px; }
+.reputation-head p, #reputationNote { color: #61718a; line-height: 1.5; }
+.reputation-head p { margin: 2px 0 16px; overflow-wrap: anywhere; }
+#reputationTotal { color: #375a4d; font-weight: 700; }
+.reputation-bars { display: grid; gap: 12px; max-width: 680px; }
+.reputation-row { display: grid; grid-template-columns: 140px minmax(0, 1fr) 90px; gap: 12px; align-items: center; }
+.reputation-row strong { text-align: right; font-variant-numeric: tabular-nums; }
+.reputation-track { height: 12px; border-radius: 99px; background: #e9eeeb; overflow: hidden; }
+.reputation-track div { height: 100%; border-radius: inherit; transition: width .3s ease; }
+.reputation-row.positive .reputation-track div { background: #279779; }
+.reputation-row.neutral .reputation-track div { background: #8caaa7; }
+.reputation-row.negative .reputation-track div { background: #d36253; }
+.reputation-panel details summary { color: #ad493b; cursor: pointer; font-weight: 650; }
+.reputation-panel li { margin: 8px 0; overflow-wrap: anywhere; }
+.live-mentions { width: 100%; max-width: 960px; margin: 0 0 18px; padding: 20px 22px; }
+.live-mentions[hidden] { display: none !important; }
+.live-mentions h3 { margin: 0; font-size: 19px; }
+.live-mentions .table-wrap { max-height: 350px; overflow: auto; margin-top: 12px; }
+.live-mentions table { width: 100%; }
+.live-mentions td { overflow-wrap: anywhere; }
+@media (max-width: 550px) { .reputation-row { grid-template-columns: 1fr auto; gap: 5px 10px; } .reputation-track { grid-column: 1 / -1; grid-row: 2; } }
+@media (prefers-reduced-motion: reduce) { .reputation-track div { transition: none; } }

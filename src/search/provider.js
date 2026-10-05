@@ -24,7 +24,7 @@ function passesContentFilters(page, query) {
 class YandexHTMLProvider extends SearchProvider {
   constructor(browser, logger) { super(); this.browser = browser; this.log = logger; }
   async search(query, settings, hooks = {}) {
-    const deadline = Date.now() + Math.max(1, Number(settings.maxDurationMinutes) || 30) * 60000;
+    const deadline = settings.deadlineAt || Date.now() + Math.max(1, Number(settings.maxDurationMinutes) || 30) * 60000;
     query.yandexText = buildYandexText(query);
     const raw = await this.browser.collect(query, settings, hooks);
     const candidates = [], seen = new Set(), candidateUrls = new Set(), visited = new Set(); let withinDuplicates = 0;
@@ -59,6 +59,7 @@ class YandexHTMLProvider extends SearchProvider {
             if ((!query.extractedDate || date) && inRange(date, query) && !candidateUrls.has(url)) {
               candidateUrls.add(url);
               candidates.push({ ...item, ...page, url: entry.url, date, normalized: url, snippetMatch, description: page.description || item.snippet });
+              hooks.onCandidate?.(candidates[candidates.length - 1]);
               matched = true;
             }
           }
@@ -81,6 +82,7 @@ class YandexHTMLProvider extends SearchProvider {
           if ((query.extractedDate && !date) || !inRange(date, query) || candidateUrls.has(url)) continue;
           candidateUrls.add(url);
           candidates.push({ ...item, date, normalized: url, description: String(item.snippet || '').slice(0, 300), snippetMatch: true });
+          hooks.onCandidate?.(candidates[candidates.length - 1]);
         }
       }
     }

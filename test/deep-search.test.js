@@ -57,3 +57,21 @@ test('обходит два перехода и применяет фильтр�
   const disabled = await provider.search(parseQuery({ query: 'Ромашка', deepPages: 1 }), { maxResults: 20, maxDurationMinutes: 1 });
   assert.equal(disabled.candidates.length, 0);
 });
+
+test('передаёт публикации по мере проверки и соблюдает время окончания поиска', async () => {
+  const found = [];
+  let inspections = 0;
+  const browser = {
+    collect: async () => [{ url: 'https://example.org/story', title: 'Ромашка', snippet: 'Ромашка открыла завод' }],
+    inspect: async () => { inspections += 1; return { title: 'Ромашка открыла завод', text: 'Ромашка открыла завод', links: [] }; },
+  };
+  const provider = new YandexHTMLProvider(browser, { warn() {} });
+  const query = parseQuery({ query: 'Ромашка' });
+  const result = await provider.search(query, { maxDurationMinutes: 1 }, { onCandidate: row => found.push(row.url) });
+  assert.deepEqual(found, ['https://example.org/story']);
+  assert.equal(result.candidates.length, 1);
+  const expired = await provider.search(query, { deadlineAt: Date.now() - 1000 }, { onCandidate: row => found.push(row.url) });
+  assert.equal(expired.candidates.length, 0);
+  assert.equal(inspections, 1);
+  assert.equal(found.length, 1);
+});
