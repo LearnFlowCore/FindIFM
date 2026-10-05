@@ -50,3 +50,71 @@
 .live-mentions td { overflow-wrap: anywhere; }
 @media (max-width: 550px) { .reputation-row { grid-template-columns: 1fr auto; gap: 5px 10px; } .reputation-track { grid-column: 1 / -1; grid-row: 2; } }
 @media (prefers-reduced-motion: reduce) { .reputation-track div { transition: none; } }
+
+/* Общая палитра рабочих экранов: тёмный зелёный, тёплый акцент и смысловые цвета. */
+:root { --signal-warm: #e3a955; --signal-soft: #f3f7f1; --signal-danger: #c95650; }
+.title-edit, .analytics-head #analyticsStatus, #analyticsMessage, .semantic-state { color: #a85135; }
+.title-input { border-color: var(--blue); }
+.keyword-monitor .monitor-state, .monitor-timing { color: #3d5a50; }
+.monitor-state::before, .keyword-monitor.scanning .monitor-state::before { background: var(--teal); }
+.keyword-monitor.scanning .monitor-state::before { animation-name: monitor-pulse-signal; }
+@keyframes monitor-pulse-signal { 60% { box-shadow: 0 0 0 9px rgba(31,155,130,0); } }
+.monitor-track { background: #e3eee8; }
+.monitor-track span { background: linear-gradient(90deg, var(--teal), #72baa2); }
+.monitor-stats span, .monitor-current, .monitor-event span:first-child { color: var(--muted); }
+.monitor-event { background: var(--signal-soft); }
+.preview-panel .preview-controls input, .preview-panel .preview-controls select,
+.analytics-form input, .dynamics-filter input, .semantic-form textarea,
+.report-form input, .report-form select, .report-word-fields input { border-color: var(--line); background: var(--paper); color: var(--ink); }
+.captcha-panel { border-color: var(--signal-warm); }
+.captcha-panel p, .captcha-warning-dialog p { color: #52675f; }
+.captcha-warning { background: rgba(23,43,42,.78); }
+.captcha-warning-dialog { border-color: var(--signal-warm); background: var(--paper); box-shadow: 0 28px 90px rgba(23,43,42,.3); }
+.captcha-warning-dialog h2 { color: var(--navy); }
+.saved-group h3 span, .saved-group summary span, .saved-details-head p, .saved-url,
+.dynamics-dialog header p, .dynamics-dialog small, .semantic-sources p, .semantic-dialog small { color: var(--muted); }
+.saved-run, .saved-pages button { border-color: var(--line); background: var(--paper); color: var(--ink); }
+.saved-run.selected { border-color: var(--teal); background: #e7f4ee; }
+.saved-run:hover { border-color: var(--teal); }
+.analytics-panel { border-color: var(--line); }
+.analytics-head p, .analytics-metric small, .analytics-note, #chartCaption, .analytics-chart-heading span { color: var(--muted); }
+.analytics-metric { background: var(--signal-soft); }
+.analytics-metric.active { background: #fff4dd; }
+.analytics-metric.measured { background: #e7f4ee; }
+.analytics-track { background: #e0e8dc; }
+.analytics-track div { background: var(--signal-warm); }
+.analytics-metric.measured .analytics-track div { background: var(--teal); }
+.analytics-chart { border-color: var(--line); background: linear-gradient(120deg, #fff4f1, #fff9ec 50%, #eaf6ee); }
+.analytics-chart-heading { color: var(--ink); }
+.report-overlay, .dynamics-overlay, .semantic-overlay { background: rgba(23,43,42,.66); }
+.report-dialog, .dynamics-dialog, .semantic-dialog { background: var(--paper); box-shadow: 0 18px 65px rgba(23,43,42,.24); }
+.report-close, .dynamics-close, .semantic-close { background: #e8eee7; color: var(--ink); }
+.report-steps span { background: #eef1e9; color: #52675f; }
+.report-steps span.active { background: #fff0cc; color: #82500f; }
+.report-form label, .dynamics-filter label { color: #3e564d; }
+.report-help, .report-progress p, .report-done p { color: var(--muted); }
+.report-word-fields, .report-progress, .dynamics-total, .semantic-choice, .semantic-answer, .semantic-excerpt { background: var(--signal-soft); border-color: var(--line); }
+.report-done { background: #e7f4ee; }
+.report-loader { border-color: #d6e9df; border-top-color: var(--teal); }
+.dynamics-track, .reputation-track { background: #e3eee8; }
+.dynamics-track span { background: linear-gradient(90deg, var(--teal), #72baa2); }
+.semantic-choice small, .semantic-excerpt { color: #3d5a50; }
+.reputation-head p, #reputationNote { color: var(--muted); }
+#reputationTotal { color: #3d5a50; }
+.reputation-row.positive .reputation-track div { background: var(--teal); }
+.reputation-row.neutral .reputation-track div { background: #849b8b; }
+.reputation-row.negative .reputation-track div { background: var(--signal-danger); }
+.reputation-panel details summary { color: #a43a35; }
+.live-mentions .table-wrap table { min-width: 580px; }
+.live-mentions a, .reputation-panel a { color: #a85135; }
+.result-group td { background: #eaf5ef; border-top-color: #cfe5d7; color: var(--ink); }
+.date-export-tabs { border-bottom-color: var(--line); }
+.date-export-tabs button { color: var(--muted); }
+.date-export-tabs button.active { border-bottom-color: var(--teal); color: #355d51; }
+.semantic-choice { border-color: var(--line); }
+.quick-start { width: 100%; max-width: 960px; margin: 0 0 16px; border-bottom: 1px solid var(--line); }
+.quick-start > summary { width: fit-content; padding: 10px 0; color: #355d51; font-weight: 650; cursor: pointer; }
+.quick-start > summary:hover { color: #a85135; }
+.quick-start > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+.quick-start ol { display: grid; gap: 7px; margin: 3px 0 15px; padding-left: 22px; color: #52675f; line-height: 1.5; }
+.quick-start strong { color: var(--ink); }

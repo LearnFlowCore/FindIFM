@@ -45,7 +45,7 @@
       row.querySelector('strong').textContent = `${counts[tone]} · ${percentage}%`;
     }
     $('.reputation-bars').setAttribute('aria-label', `Положительных ${counts.positive}, нейтральных ${counts.neutral}, отрицательных ${counts.negative}`);
-    $('#reputationNote').textContent = `${job.status === 'completed' ? 'Итоговая' : 'Предварительная'} автоматическая оценка по заголовку и описанию${job.status !== 'completed' && Number(job.liveMatches || 0) > rows.length ? ` · первые ${rows.length} из ${job.liveMatches}` : ''}. Проверяйте контекст публикации.`;
+    $('#reputationNote').textContent = `${job.status === 'completed' ? 'Итоговая' : 'Предварительная'} автооценка по заголовку и описанию${job.status !== 'completed' && Number(job.liveMatches || 0) > rows.length ? ` · первые ${rows.length} из ${job.liveMatches}` : ''}. Проверяйте контекст.`;
     const negativeRows = rows.filter(row => /^https?:\/\//i.test(row.url || '') && classifyMention(row) === 'negative').slice(0, 8);
     const details = $('#reputationNegative');
     details.hidden = !negativeRows.length;

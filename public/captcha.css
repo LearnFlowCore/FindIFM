@@ -45,3 +45,26 @@ main { padding: 18px clamp(14px, 4vw, 42px) 36px; }
 .cookie-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
 .cookie-actions button { flex: 1 1 190px; }
 #cookieStatus { min-height: 1.3em; margin-bottom: 0; }
+
+/* Та же визуальная система, что и в основном окне «Сигнала». */
+:root { --ink: #17231f; --muted: #718078; --line: #dfe6df; --paper: #fffdf8; --bg: #f1f3ed; --navy: #172b2a; --accent: #d66b43; --teal: #1f9b82; --danger: #c95650; color: var(--ink); background: var(--bg); }
+button { border-color: var(--line); border-radius: 8px; background: var(--paper); color: #3d5a50; }
+button:hover { background: #f7f5ea; border-color: var(--accent); }
+button:focus-visible, input:focus-visible { outline-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); }
+button.primary:hover { background: #bd5935; border-color: #bd5935; }
+button[aria-pressed="true"] { background: #fff0cc; border-color: #e3a955; }
+.top, .controls, #hint, .cookie-dialog { background: var(--paper); }
+.top { border-bottom-color: var(--line); }
+.brand, .cookie-kicker, .view-options summary, .extra-controls summary { color: var(--teal); }
+h1, .cookie-dialog h2 { font-family: Georgia, "Times New Roman", serif; color: var(--navy); }
+.top p, .controls small, .toolbar span, .screen-loading, #hint, .captcha-intro, .cookie-dialog p { color: var(--muted); }
+.status { background: #fff0cc; color: #82500f; }
+.status.done { background: #def2e8; color: #16765f; }
+.status.error { background: #fbe2df; color: #a33d3a; }
+.screen { background: #e8eee7; border-color: var(--line); border-radius: 12px; }
+.controls { border-radius: 15px; }
+.controls input { background: var(--paper); border-color: var(--line); }
+.extra-controls { border-top-color: var(--line); }
+.cookie-overlay { background: rgba(23,43,42,.78); }
+.cookie-dialog { border-radius: 15px; box-shadow: 0 24px 75px rgba(23,43,42,.3); }

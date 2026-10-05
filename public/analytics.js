@@ -11,23 +11,23 @@
       <div class="analytics-metric" id="responseMetric"><span>От уведомления до реакции ведомства</span><strong id="responseTime">Не измерено</strong><small id="responseState">Ожидание отметки уведомления</small><div class="analytics-track"><div id="responseBar"></div></div><small>Шкала: 4 часа</small></div>
     </div>
     <div class="analytics-chart" aria-label="График этапов от всплеска до реакции">
-      <div class="analytics-chart-heading"><strong>График этапов</strong><span>Красный — всплеск · синий — уведомление · зелёный — реакция</span></div>
+      <div class="analytics-chart-heading"><strong>График этапов</strong><span>Красный — всплеск · янтарный — уведомление · зелёный — реакция</span></div>
       <svg id="analyticsSvg" viewBox="0 0 1000 215" role="img" aria-label="Схема этапов всплеска, уведомления и реакции ведомства, не в масштабе времени">
         <defs>
-          <linearGradient id="signalFirst" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#ef4655"/><stop offset="1" stop-color="#3f8de1"/></linearGradient>
-          <linearGradient id="signalSecond" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#3f8de1"/><stop offset="1" stop-color="#20ae83"/></linearGradient>
+          <linearGradient id="signalFirst" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#c95650"/><stop offset="1" stop-color="#e3a955"/></linearGradient>
+          <linearGradient id="signalSecond" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#e3a955"/><stop offset="1" stop-color="#1f9b82"/></linearGradient>
           <filter id="signalGlow"><feGaussianBlur stdDeviation="5"/></filter>
         </defs>
-        <path d="M50 160 H950" stroke="#d9e3f2" stroke-width="3"/>
+        <path d="M50 160 H950" stroke="#dfe6df" stroke-width="3"/>
         <path id="firstLine" fill="none" stroke="url(#signalFirst)" stroke-width="7" stroke-linecap="round"/>
         <path id="secondLine" fill="none" stroke="url(#signalSecond)" stroke-width="7" stroke-linecap="round"/>
-        <circle id="peakGlow" cx="50" cy="60" r="23" fill="#f34e59" opacity=".35" filter="url(#signalGlow)"/>
-        <circle id="peakPoint" cx="50" cy="60" r="11" fill="#ec394b" stroke="#fff" stroke-width="3"/>
-        <circle id="noticePoint" cx="500" cy="110" r="9" fill="#3f8de1" stroke="#fff" stroke-width="3"/>
-        <circle id="responsePoint" cx="950" cy="125" r="9" fill="#20ae83" stroke="#fff" stroke-width="3"/>
-        <text x="50" y="194" fill="#b8384a" text-anchor="middle">ВСПЛЕСК</text>
-        <text id="noticeLabel" x="500" y="194" fill="#346db8" text-anchor="middle">УВЕДОМЛЕНИЕ</text>
-        <text x="950" y="194" fill="#148667" text-anchor="middle">РЕАКЦИЯ</text>
+        <circle id="peakGlow" cx="50" cy="60" r="23" fill="#c95650" opacity=".35" filter="url(#signalGlow)"/>
+        <circle id="peakPoint" cx="50" cy="60" r="11" fill="#c95650" stroke="#fff" stroke-width="3"/>
+        <circle id="noticePoint" cx="500" cy="110" r="9" fill="#e3a955" stroke="#fff" stroke-width="3"/>
+        <circle id="responsePoint" cx="950" cy="125" r="9" fill="#1f9b82" stroke="#fff" stroke-width="3"/>
+        <text x="50" y="194" fill="#a43a35" text-anchor="middle">ВСПЛЕСК</text>
+        <text id="noticeLabel" x="500" y="194" fill="#82500f" text-anchor="middle">УВЕДОМЛЕНИЕ</text>
+        <text x="950" y="194" fill="#147d68" text-anchor="middle">РЕАКЦИЯ</text>
       </svg>
       <p id="chartCaption">Схема не в масштабе времени. Укажите время всплеска, чтобы увидеть движение по графику.</p>
     </div>
