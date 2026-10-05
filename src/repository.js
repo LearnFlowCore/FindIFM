@@ -75,6 +75,21 @@ class Repository {
     return { rows, groups, summary, total, page, limit };
   }
   allResults(jobId) { return this.db.prepare(`SELECT * FROM results ${jobId ? 'WHERE job_id=?' : ''} ORDER BY id DESC`).all(...(jobId ? [jobId] : [])); }
+  reportResults({ scope, jobId, from, to }) {
+    const where = [], args = [];
+    if (scope === 'current') { where.push('job_id=?'); args.push(jobId); }
+    if (from) { where.push("date IS NOT NULL AND date<>'' AND date>=?"); args.push(from); }
+    if (to) { where.push("date IS NOT NULL AND date<>'' AND date<=?"); args.push(to); }
+    return this.db.prepare(`SELECT * FROM results ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY date DESC,id DESC`).all(...args);
+  }
+  resultDynamics({ jobId, from, to }) {
+    const where = ["date IS NOT NULL", "date GLOB '????-??-??'"], args = [];
+    if (jobId) { where.push('job_id=?'); args.push(jobId); }
+    if (from) { where.push('date>=?'); args.push(from); }
+    if (to) { where.push('date<=?'); args.push(to); }
+    const points = this.db.prepare(`SELECT date AS day, COUNT(*) AS count FROM results WHERE ${where.join(' AND ')} GROUP BY date ORDER BY date`).all(...args);
+    return { points, total: points.reduce((sum, point) => sum + point.count, 0) };
+  }
   resultsByQueryDate(jobId) {
     const history = this.db.prepare('SELECT * FROM search_history WHERE job_id=?').get(jobId);
     if (!history?.extracted_date) throw new Error('В текущем поисковом запросе не указана дата.');

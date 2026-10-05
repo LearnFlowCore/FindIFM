@@ -71,6 +71,9 @@ body { background: var(--bg); color: var(--ink); font-family: "Segoe UI", Arial,
 .eyebrow, .workflow-kicker { color: var(--teal); font-weight: 800; }
 .topbar h1, .section-intro h2 { font-family: Georgia, "Times New Roman", serif; color: #17302c; letter-spacing: -.8px; }
 .topbar h1 { font-size: 30px; }
+.title-edit { margin-top: 5px; padding: 4px 0; background: none; color: #3466a5; font-size: 12px; font-weight: 650; }
+.title-input { display: block; width: min(100%, 600px); padding: 7px 10px; border: 2px solid #3f8de1; border-radius: 8px; font: 26px Georgia, serif; }
+.title-input[hidden], .topbar h1[hidden] { display: none; }
 .section-intro h2 { font-size: 27px; }
 .section-intro p { max-width: 690px; line-height: 1.55; }
 .card { border-color: #e2e7df; border-radius: 15px; box-shadow: var(--shadow); }
@@ -177,10 +180,17 @@ tbody tr:hover { background: #fffaf0; }
 .saved-group { padding: 18px; }
 .saved-group h3 { margin: 0 0 14px; overflow-wrap: anywhere; }
 .saved-group h3 span { display: block; margin-top: 5px; color: #65758b; font-size: 13px; font-weight: 500; }
+.saved-group summary { font-size: 18px; font-weight: 750; cursor: pointer; margin-bottom: 3px; overflow-wrap: anywhere; }
+.saved-group summary span { display: block; margin: 5px 0 0 26px; color: #65758b; font-size: 13px; font-weight: 500; }
+.saved-group[open] summary { margin-bottom: 14px; }
 .saved-run { display: flex; align-items: center; gap: 8px; width: 100%; padding: 11px; border: 1px solid #e2e9f4; border-radius: 8px; background: #fff; color: #263c60; text-align: left; cursor: pointer; margin-top: 6px; }
 .saved-run span:last-child { margin-left: auto; white-space: nowrap; }
 .saved-run.selected { border-color: #3778e2; background: #edf4ff; }
 .saved-run:hover { border-color: #3778e2; }
+.saved-folder-row { display: flex; align-items: center; gap: 8px; }
+.saved-folder-row .saved-run { min-width: 0; flex: 1; }
+.saved-folder-row .saved-run strong { overflow-wrap: anywhere; }
+.saved-folder-row .mini-button { flex: none; }
 .saved-details { padding: 20px; }
 .saved-details[hidden] { display: none !important; }
 .saved-details-head, .saved-actions, .saved-pages { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
@@ -226,3 +236,43 @@ tbody tr:hover { background: #fffaf0; }
 .analytics-quick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 #analyticsMessage { color: #3466a5; min-height: 1em; margin-bottom: 0; }
 @media (max-width: 650px) { .analytics-metrics { grid-template-columns: 1fr; } }
+.report-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(20, 36, 65, .6); display: flex; align-items: center; justify-content: center; overflow: auto; padding: 16px; }
+.report-overlay[hidden], .report-form[hidden], .report-progress[hidden], .report-done[hidden], .report-error[hidden] { display: none !important; }
+.report-dialog { flex: none; min-width: 400px; max-height: calc(100vh - 32px); overflow: auto; background: white; padding: 24px; border-radius: 16px; box-shadow: 0 18px 65px #132b5355; }
+.report-dialog header { display: flex; justify-content: space-between; align-items: start; gap: 14px; }
+.report-dialog h2 { margin: 5px 0 12px; }
+.report-close { border: 0; background: #edf2fa; border-radius: 8px; font-size: 26px; cursor: pointer; width: 38px; height: 38px; }
+.report-steps { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 22px; }
+.report-steps span { padding: 8px 12px; border-radius: 8px; color: #526782; background: #eef2f8; }
+.report-steps span.active { color: #1554b0; background: #deecff; font-weight: 750; }
+.report-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.report-form label { display: grid; gap: 6px; color: #304564; font-weight: 650; }
+.report-form input, .report-form select { width: 100%; padding: 10px; border: 1px solid #cbd9ea; border-radius: 8px; background: white; }
+.report-help { grid-column: 1 / -1; margin: 0; color: #586b88; line-height: 1.5; }
+.report-form button { justify-self: start; }
+.report-progress, .report-done { padding: 22px; border-radius: 12px; background: #f1f6ff; }
+.report-progress p, .report-done p { color: #586b88; }
+.report-done { background: #e8f7ee; }
+.report-done .button { display: inline-block; margin: 8px 10px 0 0; text-decoration: none; }
+.report-loader { width: 32px; height: 32px; border: 4px solid #c9dfff; border-top-color: #2976de; border-radius: 50%; animation: report-spin .8s linear infinite; margin-bottom: 12px; }
+.report-error { padding: 12px; color: #9b2828; background: #ffe5e5; border-radius: 8px; }
+@keyframes report-spin { to { transform: rotate(360deg); } }
+@media (max-width: 500px) { .report-overlay { justify-content: flex-start; } .report-form { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .report-loader { animation: none; } }
+.dynamics-overlay { position: fixed; inset: 0; z-index: 1001; background: #14244199; display: grid; place-items: center; padding: 16px; }
+.dynamics-overlay[hidden] { display: none; }
+.dynamics-dialog { background: white; width: min(100%, 760px); max-height: calc(100vh - 32px); overflow: auto; border-radius: 16px; padding: 22px; box-shadow: 0 18px 65px #132b5355; }
+.dynamics-dialog header { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.dynamics-dialog h2 { margin: 5px 0; }
+.dynamics-dialog header p, .dynamics-dialog small { color: #65758b; }
+.dynamics-close { border: 0; background: #edf2fa; border-radius: 8px; font-size: 26px; cursor: pointer; width: 38px; height: 38px; flex: none; }
+.dynamics-filter { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.dynamics-filter label { display: grid; gap: 5px; color: #304564; font-weight: 650; }
+.dynamics-filter input { padding: 9px; border: 1px solid #cbd9ea; border-radius: 8px; }
+.dynamics-total { display: flex; gap: 10px; align-items: baseline; padding: 16px; background: #e8f2ff; border-radius: 10px; }
+.dynamics-total strong { font-size: 32px; }
+.dynamics-bars { max-height: 370px; overflow: auto; display: grid; gap: 9px; margin: 12px 0; }
+.dynamics-bar { display: grid; grid-template-columns: 90px minmax(30px, 1fr) 40px; gap: 9px; align-items: center; }
+.dynamics-bar time, .dynamics-bar strong { font-size: 13px; font-variant-numeric: tabular-nums; }
+.dynamics-track { background: #e7eef8; border-radius: 99px; height: 13px; }
+.dynamics-track span { display: block; height: 100%; background: linear-gradient(90deg,#437ee3,#27b49b); border-radius: inherit; }

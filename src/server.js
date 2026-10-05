@@ -17,7 +17,13 @@ const { NotificationService } = require('./notifications');
 const { exportXlsx, exportCsv, exportTxt } = require('./export');
 
 function highlightTerms(query) {
-  return [...new Set(String(query || '').split(/\s+/).map(word => word.trim()).filter(word => word.length > 1))].sort((a, b) => b.length - a.length).slice(0, 30);
+  const phrase = String(query || '').trim().replace(/^['"«]+|['"»]+$/g, '');
+  const words = phrase.split(/\s+/).map(word => word.trim()).filter(word => word.length > 1);
+  return [...new Set([phrase, ...words].filter(word => word.length > 1))].sort((a, b) => b.length - a.length).slice(0, 30);
+}
+function validPeriodDate(value) {
+  return !value || (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value);
 }
 
 function remoteUrlAllowed(value) {
@@ -89,7 +95,7 @@ async function startServer(options = {}) {
       const type = response.headers.get('content-type') || '';
       if (!type.includes('text/html')) return res.redirect(target);
       const html = (await response.text()).slice(0, 4_000_000);
-      res.set('Content-Type', 'text/html; charset=utf-8').send(highlightedHtml(html, target, req.query.q));
+      res.set('Content-Type', 'text/html; charset=utf-8').send(highlightedHtml(html.replace(/<meta\s+[^>]*http-equiv=["']?Content-Security-Policy["']?[^>]*>/gi, ''), target, req.query.q));
     } finally { clearTimeout(timer); }
   }));
   app.use('/api', (req, res, next) => {
@@ -163,6 +169,13 @@ async function startServer(options = {}) {
     includeKeywords: req.query.includeKeywords, excludeKeywords: req.query.excludeKeywords,
     includeUnknownDate: req.query.includeUnknownDate !== 'false' && req.query.undefinedDate !== 'false',
   })));
+  app.get('/api/results/dynamics', (req, res) => {
+    const { jobId, from, to } = req.query;
+    if (!validPeriodDate(from) || !validPeriodDate(to) || (from && to && from > to)) return res.status(400).json({ error: 'Укажите корректный период.' });
+    const run = jobId ? repo.historyById(jobId) : null;
+    if (jobId && !run) return res.status(404).json({ error: 'Поисковый запуск не найден.' });
+    return res.json(repo.resultDynamics({ jobId: run?.job_id, from, to }));
+  });
   app.delete('/api/results/:id', rejectWhileBusy, (req, res) => repo.deleteResult(req.params.id)
     ? res.status(204).end() : res.status(404).json({ error: 'Результат не найден.' }));
   app.get('/api/history', (_req, res) => res.json(repo.history()));
@@ -238,6 +251,20 @@ async function startServer(options = {}) {
     return { file: filename, url: `/exports/${encodeURIComponent(filename)}${token ? `?token=${encodeURIComponent(token)}` : ''}` };
   }
   app.post('/api/export', requireBody, asyncRoute(async (req, res) => res.json(await makeExport(req.body.scope || 'current', req.body.jobId))));
+  app.post('/api/export/report', requireBody, asyncRoute(async (req, res) => {
+    const { scope, format, jobId, from, to } = req.body;
+    if (!['current', 'all'].includes(scope) || !['xlsx', 'csv', 'txt'].includes(format)) return res.status(400).json({ error: 'Выберите тип и формат отчёта.' });
+    const run = scope === 'current' && jobId ? repo.historyById(jobId) : null;
+    if (scope === 'current' && !run) return res.status(400).json({ error: 'Выберите существующий поисковый запуск.' });
+    if (!validPeriodDate(from) || !validPeriodDate(to) || (from && to && from > to)) return res.status(400).json({ error: 'Проверьте даты начала и конца периода.' });
+    const rows = repo.reportResults({ scope, jobId: run?.job_id, from, to });
+    const file = `report_${new Date().toISOString().replace(/[:.]/g, '-')}_${crypto.randomBytes(4).toString('hex')}.${format}`;
+    const destination = path.join(exportRoot, file);
+    if (format === 'xlsx') await exportXlsx(rows, destination);
+    else if (format === 'csv') exportCsv(rows, destination);
+    else exportTxt(rows, destination);
+    return res.json({ file, count: rows.length, url: `/exports/${encodeURIComponent(file)}${token ? `?token=${encodeURIComponent(token)}` : ''}` });
+  }));
   app.post('/api/export/txt', requireBody, asyncRoute(async (req, res) => {
     const rows = repo.allResults(req.body.jobId || null);
     const filename = 'FindIFM.txt';
