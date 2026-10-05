@@ -102,6 +102,31 @@
   async function loadTasks() { try { const tasks = await api('/api/jobs'); const body = $('#tasksBody'); if (!body) return; body.innerHTML = tasks.map(task => { const current = task.live || task; const active = ['queued','running','waiting_captcha','stopping'].includes(current.status); return `<tr><td><strong>${escape(task.query)}</strong><span class="domain">${escape(task.job_id)}</span></td><td><span class="pill ${current.status === 'completed' ? 'success' : current.status === 'failed' ? 'failed' : 'pending'}">${escape(current.status)}</span></td><td>${Number(current.progress ?? task.progress ?? 0)}%<span class="domain">${escape(current.message || task.message || '')}</span></td><td>${Number(task.results_count || 0)}</td><td>${escape(date(task.updated_at || task.timestamp))}</td><td><div class="task-actions"><button class="mini-button" data-job-logs="${escape(task.job_id)}">Логи</button>${active ? `<button class="mini-button delete" data-stop-job="${escape(task.job_id)}">Стоп</button>` : `<button class="mini-button" data-restart-job="${escape(task.job_id)}">Повторить</button>`}</div></td></tr>`; }).join('') || '<tr><td colspan="6">Задач пока нет.</td></tr>'; } catch (error) { notify(error.message, true); } }
   async function loadTaskLogs(id) { const logs = await api(`/api/jobs/${encodeURIComponent(id)}/logs`); $('#taskLogTitle').textContent = id; $('#taskLog').textContent = logs.map(item => `${item.timestamp} [${item.level}] ${item.event}: ${item.message}`).join('\n') || 'Записей нет.'; }
   function setupResultsTable() { const head = $('#resultsView thead tr'); head.innerHTML = '<th data-sort="title">Публикация</th><th data-sort="domain">Домен</th><th data-sort="date">Дата</th><th>Полное описание</th><th>Категория</th><th>Длина</th><th>Медиа</th><th data-sort="status">Статус</th><th data-sort="query">Запрос</th><th>Действие</th>'; $$('th[data-sort]', head).forEach(th => th.addEventListener('click', () => { state.sort = th.dataset.sort; state.order = state.order === 'desc' ? 'asc' : 'desc'; loadResults(); })); }
+  function setupQuietLayout() {
+    function group(element, label, className = '') {
+      const details = document.createElement('details');
+      details.className = `quiet-group ${className}`;
+      const summary = document.createElement('summary');
+      summary.textContent = label;
+      element.before(details);
+      details.append(summary, element);
+      return { details, summary };
+    }
+    group($$('#searchForm > .form-grid')[2], 'Домены и исключения');
+    group($('.advanced-search'), 'Точность и дополнительные условия');
+    group($('#resultsView .inline-actions'), 'Сохранить и экспортировать', 'result-actions-group');
+    const filters = group($('.result-filter-fields'), 'Дополнительные фильтры');
+    const filterFields = $$('input, select', filters.details);
+    const updateFilterLabel = () => {
+      filters.summary.textContent = filterFields.some(field => field.value.trim()) ? 'Дополнительные фильтры · активны' : 'Дополнительные фильтры';
+    };
+    filters.details.addEventListener('input', updateFilterLabel);
+    filters.details.addEventListener('change', updateFilterLabel);
+    $('#resetResultFilters').addEventListener('click', () => setTimeout(updateFilterLabel, 0));
+    group($('.preview-panel'), 'Предпросмотр перед выгрузкой');
+    group($('.result-save-panel'), 'Скопировать найденные ссылки');
+    group($('#exportLink'), 'Выгрузка по дате запроса');
+  }
   const renderResultsTable = renderResults;
   renderResults = () => { const rows = state.results; const summary = state.summary || {}; const linkCount = Number(summary.publications ?? state.total ?? 0); $('#resultCount').textContent = linkCount; $('#resultsEmpty').hidden = rows.length > 0; $('#resultsSummary').textContent = linkCount ? `Найдено ссылок: ${linkCount}. СМИ: ${Number(summary.media || 0)}` : 'По заданным условиям публикации не найдены'; const summaries = state.resultGroups.map(group => `<tr class="result-group"><td colspan="10"><strong>${escape(group.query || 'Без запроса')}</strong><span>${Number(group.count || 0)} публикаций · ${Number(group.domains || 0)} сайтов</span></td></tr>`).join(''); const items = rows.map(row => `<tr><td><a class="result-title" href="${escape(row.url)}" target="_blank" rel="noopener">${escape(row.title || 'Открыть публикацию')}</a><a class="full-url" href="${escape(row.url)}" target="_blank" rel="noopener">${escape(row.url)}</a></td><td class="domain">${escape(row.domain)}</td><td class="date">${escape(row.date || 'Не определена')}</td><td class="full-description">${escape(row.description)}</td><td>${escape(row.category || 'Не определена')}</td><td>${Number(row.text_length || 0).toLocaleString('ru-RU')}</td><td>${row.has_media ? 'Есть' : 'Нет'}</td><td><span class="pill ${row.status === 'новый' ? 'pending' : row.status === 'уже найден ранее' ? 'failed' : 'success'}">${escape(row.status || 'новый')}</span></td><td>${escape(row.query || '')}</td><td><button class="mini-button delete" data-delete-result="${escape(row.id)}">Удалить</button></td></tr>`).join(''); $('#resultsBody').innerHTML = summaries + items; $('#pageInfo').textContent = `${linkCount} результатов`; const pages = Math.max(1, Math.ceil(state.total / state.pageSize)); $('#pagination').innerHTML = Array.from({ length: Math.min(pages, 7) }, (_, i) => i + 1).map(page => `<button class="page-button ${page === state.page ? 'active' : ''}" data-page="${page}">${page}</button>`).join(''); const field = $('#resultLinksText'); if (field) field.value = rows.map(row => row.url).filter(Boolean).join('\n'); const count = $('#settingsResultCount'); if (count) count.textContent = `Доступно ссылок: ${state.total}`; };
   function addHighlightActions() { $$('#resultsBody tr').forEach(row => { const action = row.lastElementChild; if (!action || action.querySelector('.highlight-button') || row.children.length < 10) return; const source = row.querySelector('a.result-title'); if (!source) return; const query = row.children[8]?.textContent?.trim() || ''; const originalUrl = source.href; const url = new URL('/highlight', location.origin); url.searchParams.set('url', originalUrl); url.searchParams.set('q', query); source.href = url.toString(); const link = document.createElement('a'); link.className = 'mini-button highlight-button'; link.href = url.toString(); link.target = '_blank'; link.rel = 'noopener'; link.textContent = 'Подсветить'; action.prepend(link); }); }
@@ -276,7 +301,7 @@
   renderKeywordMonitor = job => { renderMonitorBase(job); $('#monitorEta').textContent = $('#monitorEta').textContent.replace('ETA', 'Осталось'); setStopVisible(['queued', 'running', 'waiting_captcha'].includes(job.status)); $('#monitorSearchPages').textContent = Number(job.searchPages || 0); };
   $('#copyResultLinks').addEventListener('click', async () => { const field = $('#resultLinksText'); if (!field.value) return notify('Нет ссылок для копирования', true); await navigator.clipboard.writeText(field.value); notify('Ссылки скопированы, каждая с новой строки'); });
   $('#saveResultsTxt').addEventListener('click', saveResultsTxt);
-  setupAdvancedSearch(); setupQuickTest(); setupSettingsExtensions(); setupAdmin(); setupSavedArchive(); setupResultFilters(); setupResultsTable(); setupDateExport(); setupKeywordMonitor(); setupCaptcha(); setupPreview(); setupDocumentTitle();
+  setupAdvancedSearch(); setupQuickTest(); setupSettingsExtensions(); setupAdmin(); setupSavedArchive(); setupResultFilters(); setupResultsTable(); setupDateExport(); setupKeywordMonitor(); setupCaptcha(); setupPreview(); setupDocumentTitle(); setupQuietLayout();
   $('#adminView .workflow-kicker').textContent = 'УПРАВЛЕНИЕ / ЗАДАЧИ';
   $('#settingsForm [name="userAgent"]').previousElementSibling.textContent = 'Идентификатор браузера';
   $('#keywordMonitor .monitor-stats').insertAdjacentHTML('afterbegin', '<div><strong id="monitorSearchPages">0</strong><span>страниц выдачи</span></div>');

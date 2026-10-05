@@ -13,24 +13,22 @@
     <span id="status" class="status" role="status">Подключаемся...</span>
   </header>
   <main>
-    <p class="captcha-intro">Нажимайте на цифры и картинки прямо на изображении. Текст введите в поле ниже.</p>
-    <div class="toolbar">
+    <p class="captcha-intro">Коснитесь задания на изображении. Для ответа словами выберите поле на изображении и введите текст ниже.</p>
+    <div class="screen fit" id="screen" aria-label="Изображение проверки Яндекса"><div id="loading" class="screen-loading" role="status">Загружаем изображение проверки…</div><img id="image" draggable="false" alt="Страница проверки Яндекса; нажмите на нужное поле или выполните задание"></div>
+    <details class="view-options"><summary>Масштаб и обновление изображения</summary><div class="toolbar">
       <button id="fit" type="button" aria-pressed="true">По ширине</button>
       <button id="fullSize" type="button" aria-pressed="false">Оригинальный размер</button>
       <button id="refresh" type="button">↻ Обновить изображение</button>
-    </div>
-    <div class="screen fit" id="screen" aria-label="Изображение проверки Яндекса"><div id="loading" class="screen-loading" role="status">Загружаем изображение проверки…</div><img id="image" draggable="false" alt="Страница проверки Яндекса; нажмите на нужное поле или выполните задание"></div>
+    </div></details>
     <div class="controls">
       <label for="answer">Если нужно ввести текст</label>
-      <div class="action-row"><input id="answer" type="text" inputmode="text" enterkeyhint="done" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Ответ с изображения" aria-describedby="answerHelp"><button id="type" type="button" class="primary">Отправить текст ↗</button><button id="enter" type="button">Подтвердить выбор ↗</button></div>
-      <small id="answerHelp">Коснитесь поля ответа на изображении, затем введите текст здесь. Кнопка отправит его и подтвердит.</small>
-      <details class="extra-controls"><summary>Дополнительные действия</summary><div class="action-row"><button id="tab" type="button">Следующее поле</button><button id="backspace" type="button">⌫ Удалить символ</button><button id="scrollUp" type="button">↑ Прокрутить страницу</button><button id="scrollDown" type="button">↓ Прокрутить страницу</button></div></details>
+      <div class="action-row"><input id="answer" type="text" inputmode="text" enterkeyhint="done" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Ответ с изображения"><button id="type" type="button" class="primary">Отправить текст ↗</button></div>
+      <details class="extra-controls"><summary>Другие действия</summary><div class="action-row"><button id="enter" type="button">Подтвердить выбор ↗</button><button id="tab" type="button">Следующее поле</button><button id="backspace" type="button">⌫ Удалить символ</button><button id="scrollUp" type="button">↑ Прокрутить страницу</button><button id="scrollDown" type="button">↓ Прокрутить страницу</button></div></details>
     </div>
     <p id="hint" role="status" aria-live="polite">Загружаем CAPTCHA…</p>
   </main>
   <div class="cookie-overlay" id="cookieOverlay" hidden>
     <section class="cookie-dialog" role="alertdialog" aria-modal="true" aria-labelledby="cookieTitle" aria-describedby="cookieDescription">
-      <span class="cookie-kicker">СНАЧАЛА ПОДТВЕРЖДЕНИЕ COOKIE</span>
       <h2 id="cookieTitle">Принять cookie Яндекса?</h2>
       <p id="cookieDescription">Яндекс показывает согласие на cookie перед CAPTCHA.</p>
       <div class="cookie-actions"><button id="acceptCookies" class="primary" type="button">Принять cookie и продолжить</button><button id="showCookiePage" type="button">Показать окно на изображении</button></div>

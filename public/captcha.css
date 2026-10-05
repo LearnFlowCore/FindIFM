@@ -18,7 +18,7 @@ h1 { margin: 5px 0; font-size: 27px; }
 main { padding: 18px clamp(14px, 4vw, 42px) 36px; }
 .captcha-intro { margin: 0 0 14px; color: #455976; line-height: 1.5; }
 .toolbar, .action-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
-.toolbar { margin-bottom: 14px; }
+.toolbar { margin-top: 12px; }
 .toolbar span { color: #52647e; }
 .screen { position: relative; background: #dce4ef; border: 1px solid #c8d4e5; border-radius: 10px; min-height: 260px; overflow: auto; }
 .screen-loading { display: grid; place-items: center; min-height: 260px; color: #455976; font-weight: 700; text-align: center; padding: 20px; }
@@ -31,7 +31,8 @@ main { padding: 18px clamp(14px, 4vw, 42px) 36px; }
 .controls input { min-width: 180px; flex: 1; padding: 10px; border: 1px solid #bfcce0; border-radius: 8px; }
 .controls small { color: #586781; line-height: 1.5; }
 .extra-controls { border-top: 1px solid #e1e7f0; padding-top: 11px; }
-.extra-controls summary { cursor: pointer; font-weight: 650; color: #245ecd; }
+.view-options { margin-top: 14px; }
+.view-options summary, .extra-controls summary { cursor: pointer; font-weight: 650; color: #245ecd; }
 .extra-controls .action-row { margin-top: 10px; }
 #hint { color: #455976; line-height: 1.5; padding: 13px 16px; background: #fff; border-radius: 9px; }
 @media (max-width: 600px) { .top { align-items: flex-start; } .controls button { flex: 1 1 auto; } }
