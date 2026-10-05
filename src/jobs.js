@@ -3,6 +3,7 @@ const crypto = require('node:crypto');
 const { parseQuery } = require('./utils/query');
 const { exportTxtSnapshot } = require('./export');
 const { cleanText, normalizePrices, titleKey, sourceId, validHttpUrl } = require('./utils/content');
+const semantic = require('./semantic');
 
 class JobManager {
   constructor(repo, provider, logger, notify, internetCheck) {
@@ -71,6 +72,10 @@ class JobManager {
         onSiteError: () => { job.skippedErrors += 1; },
       });
        if (job.cancelled) throw new Error('Поиск остановлен пользователем');
+      if (query.semantic) {
+        this.repo.updateTask(id, 'running', 82, 'Оценка смысловой близости публикаций');
+        candidates.splice(0, candidates.length, ...await semantic.rank(query.text, candidates, () => Boolean(job.cancelled)));
+      }
       job.progress = 85;
       this.repo.updateTask(id, 'running', 85, 'Формирование результатов');
        const rows = [], now = new Date().toISOString(), historical = new Set(), titles = new Set(), sourceIds = new Set();
@@ -93,6 +98,7 @@ class JobManager {
           title: cleanText(item.title || item.url), date: item.date || null, description: normalizePrices(item.description || item.snippet).slice(0, 2000),
           query: query.original, searchDate: now, searchRunDate: now, status, snippetMatch: item.snippetMatch ? 1 : 0,
           category: item.category || '', textLength: Number(item.textLength || item.text?.length || 0), hasMedia: item.hasMedia ? 1 : 0,
+          evidence: item.evidence || '', semanticScore: item.semanticScore ?? null,
         });
       }
       this.repo.addResults(id, rows);

@@ -54,7 +54,7 @@ class YandexHTMLProvider extends SearchProvider {
         try {
           const page = await this.browser.inspect(url, query, settings);
           let matched = false;
-          if (textMatches(`${page.title} ${page.text}`, query) && passesContentFilters(page, query)) {
+          if ((query.semantic || textMatches(`${page.title} ${page.text}`, query)) && passesContentFilters(page, query)) {
             const date = parseDate(page.dateText) || (entry.depth === 0 ? parseDate(item.dateText) : null) || parseDate(url);
             if ((!query.extractedDate || date) && inRange(date, query) && !candidateUrls.has(url)) {
               candidateUrls.add(url);
@@ -76,7 +76,7 @@ class YandexHTMLProvider extends SearchProvider {
         } catch (error) {
           hooks.onSiteError?.(url, error.message);
           this.log.warn({ url, error: error.message }, 'Не удалось загрузить найденную страницу');
-          if (entry.depth !== 0 || !snippetMatch || query.category || query.minTextLength || query.maxTextLength || query.media !== 'any' || query.includeKeywords?.length || query.excludeKeywords?.length) continue;
+          if (entry.depth !== 0 || (!query.semantic && !snippetMatch) || query.category || query.minTextLength || query.maxTextLength || query.media !== 'any' || query.includeKeywords?.length || query.excludeKeywords?.length) continue;
           const date = parseDate(item.dateText);
           if ((query.extractedDate && !date) || !inRange(date, query) || candidateUrls.has(url)) continue;
           candidateUrls.add(url);

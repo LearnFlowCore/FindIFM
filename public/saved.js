@@ -29,7 +29,8 @@
   function normalizeRow(row) {
     return {
       url: row.url || '', title: row.title || '', domain: row.domain || '', date: row.date || '',
-      description: row.description || '', query: row.query || '', status: row.status || '',
+       description: row.description || '', evidence: row.evidence || '', semantic_score: row.semantic_score ?? row.semanticScore ?? null,
+       query: row.query || '', status: row.status || '',
       category: row.category || '', text_length: Number(row.text_length ?? row.textLength ?? 0),
       has_media: Number(row.has_media ?? row.hasMedia ?? 0),
     };

@@ -30,6 +30,7 @@ function parseQuery(input = {}) {
   if (!Number.isSafeInteger(deepPages) || deepPages < 0 || deepPages > 30) throw new Error('Глубина обхода сайта должна быть от 0 до 30 страниц.');
   return {
     original, text: searchText, normalized, exactPhrase, matchMode,
+    semantic: input.semantic === true,
     words: [...new Set(normalized.split(' ').filter(Boolean))],
     acronyms: [...new Set(acronyms)],
     extractedDate: extracted.date, period: input.period || null, ...range,

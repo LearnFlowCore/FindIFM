@@ -35,9 +35,9 @@ class Repository {
   hasUrl(url) { return Boolean(this.db.prepare('SELECT 1 FROM results WHERE url_normalized=? LIMIT 1').get(url)); }
   addResults(jobId, rows) {
     const statement = this.db.prepare(`INSERT INTO results
-      (job_id,url,url_normalized,domain,title,date,description,query,search_date,search_run_date,status,snippet_match,category,text_length,has_media)
-      VALUES (@jobId,@url,@urlNormalized,@domain,@title,@date,@description,@query,@searchDate,@searchRunDate,@status,@snippetMatch,@category,@textLength,@hasMedia)`);
-    this.db.transaction(items => items.forEach(item => statement.run({ jobId, ...item, category: item.category || '', textLength: Number(item.textLength || 0), hasMedia: Number(item.hasMedia || 0) })))(rows);
+      (job_id,url,url_normalized,domain,title,date,description,query,search_date,search_run_date,status,snippet_match,category,text_length,has_media,evidence,semantic_score)
+      VALUES (@jobId,@url,@urlNormalized,@domain,@title,@date,@description,@query,@searchDate,@searchRunDate,@status,@snippetMatch,@category,@textLength,@hasMedia,@evidence,@semanticScore)`);
+    this.db.transaction(items => items.forEach(item => statement.run({ jobId, ...item, category: item.category || '', textLength: Number(item.textLength || 0), hasMedia: Number(item.hasMedia || 0), evidence: item.evidence || '', semanticScore: item.semanticScore ?? null })))(rows);
   }
   results(options = {}) {
     const page = Math.max(1, Number(options.page) || 1);
@@ -68,7 +68,8 @@ class Repository {
     const total = this.db.prepare(`SELECT COUNT(*) AS count FROM results ${clause}`).get(...args).count;
     const groups = this.db.prepare(`SELECT query,COUNT(*) AS count,COUNT(DISTINCT domain) AS domains FROM results ${clause} GROUP BY query ORDER BY query`)
       .all(...args);
-    const rows = this.db.prepare(`SELECT * FROM results ${clause} ORDER BY ${sort} ${order},id DESC LIMIT ? OFFSET ?`)
+    const rankOrder = options.jobId && sort === 'search_date' && order === 'DESC' ? 'semantic_score DESC,' : '';
+    const rows = this.db.prepare(`SELECT * FROM results ${clause} ORDER BY ${rankOrder}${sort} ${order},id DESC LIMIT ? OFFSET ?`)
       .all(...args, limit, (page - 1) * limit);
     const summary = this.db.prepare(`SELECT COUNT(*) AS publications, COUNT(DISTINCT domain) AS media,
       MIN(date) AS date_from, MAX(date) AS date_to FROM results ${clause}`).get(...args);

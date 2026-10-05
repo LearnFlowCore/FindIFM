@@ -15,6 +15,7 @@ const { YandexHTMLProvider } = require('./search/provider');
 const { JobManager } = require('./jobs');
 const { NotificationService } = require('./notifications');
 const { exportXlsx, exportCsv, exportTxt } = require('./export');
+const semantic = require('./semantic');
 
 function highlightTerms(query) {
   const phrase = String(query || '').trim().replace(/^['"«]+|['"»]+$/g, '');
@@ -119,16 +120,18 @@ async function startServer(options = {}) {
     res.json({
       ok: true, internet: status.ok, detail: status.detail, checkedAt: internet.checkedAt,
       browserPath, browserExists: Boolean(browserPath && fs.existsSync(browserPath)),
-      browserConnected: Boolean(browser.browser?.connected),
+      browserConnected: Boolean(browser.browser?.connected), semanticAvailable: semantic.configured(),
     });
   }));
   app.post('/api/search', requireBody, asyncRoute(async (req, res) => {
+    if (req.body.semantic === true && !semantic.configured()) return res.status(503).json({ error: 'Поиск по смыслу пока не настроен: нужен AI_API_KEY на сервере.' });
     const status = await checkInternet();
     if (!status.ok) { notify('failed', 'Поиск остановлен: нет интернет-соединения'); return res.status(503).json({ error: 'Нет интернет-соединения.' }); }
     const jobId = jobs.start(req.body);
     return res.status(202).json({ jobId, captchaToken: jobs.captchaToken(jobId) });
   }));
   app.post('/api/search/test', requireBody, rejectWhileBusy, asyncRoute(async (req, res) => {
+    if (req.body.semantic === true && !semantic.configured()) return res.status(503).json({ error: 'Поиск по смыслу пока не настроен: нужен AI_API_KEY на сервере.' });
     const status = await checkInternet();
     if (!status.ok) return res.status(503).json({ error: 'Нет интернет-соединения.' });
     const jobId = jobs.start({ ...req.body, quickTest: true });
@@ -157,6 +160,7 @@ async function startServer(options = {}) {
     const previous = repo.historyById(req.params.id);
     if (!previous) return res.status(404).json({ error: 'Задание не найдено.' });
     const query = JSON.parse(previous.query_json);
+    if (query.semantic && !semantic.configured()) return res.status(503).json({ error: 'Для повтора поиска по смыслу нужен AI_API_KEY на сервере.' });
     const jobId = jobs.start(query);
     return res.status(202).json({ jobId, captchaToken: jobs.captchaToken(jobId) });
   }));
@@ -176,6 +180,20 @@ async function startServer(options = {}) {
     if (jobId && !run) return res.status(404).json({ error: 'Поисковый запуск не найден.' });
     return res.json(repo.resultDynamics({ jobId: run?.job_id, from, to }));
   });
+  app.post('/api/semantic/summary', requireBody, asyncRoute(async (req, res) => {
+    if (!semantic.configured()) return res.status(503).json({ error: 'Языковая модель пока не настроена: нужен AI_API_KEY на сервере.' });
+    const run = req.body.jobId ? repo.historyById(req.body.jobId) : null;
+    if (req.body.jobId && !run && !Array.isArray(req.body.rows)) return res.status(404).json({ error: 'Поисковый запуск не найден.' });
+    if (!run && !Array.isArray(req.body.rows)) return res.status(400).json({ error: 'Выберите поиск или сохранённый архив.' });
+    const rows = run ? repo.allResults(run.job_id).sort((a, b) => (b.semantic_score ?? -1) - (a.semantic_score ?? -1)) : req.body.rows;
+    const selected = rows.slice(0, 12).filter(row => row && typeof row === 'object' && remoteUrlAllowed(row.url)).map(row => ({
+      url: row.url, title: String(row.title || '').slice(0, 250), date: String(row.date || '').slice(0, 32),
+      evidence: String(row.evidence || row.description || '').slice(0, 700),
+    }));
+    const question = String(req.body.question || run?.query || '').trim().slice(0, 500);
+    if (!question) return res.status(400).json({ error: 'Укажите вопрос для сводки.' });
+    return res.json(await semantic.summarize(question, selected));
+  }));
   app.delete('/api/results/:id', rejectWhileBusy, (req, res) => repo.deleteResult(req.params.id)
     ? res.status(204).end() : res.status(404).json({ error: 'Результат не найден.' }));
   app.get('/api/history', (_req, res) => res.json(repo.history()));
@@ -206,6 +224,7 @@ async function startServer(options = {}) {
     if (!previous) return res.status(404).json({ error: 'Запись истории не найдена.' });
     let query;
     try { query = JSON.parse(previous.query_json); } catch { return res.status(409).json({ error: 'Параметры этого запуска повреждены.' }); }
+    if (query.semantic && !semantic.configured()) return res.status(503).json({ error: 'Для повтора поиска по смыслу нужен AI_API_KEY на сервере.' });
     const status = await checkInternet();
     if (!status.ok) return res.status(503).json({ error: 'Нет интернет-соединения.' });
     const jobId = jobs.start(query);
