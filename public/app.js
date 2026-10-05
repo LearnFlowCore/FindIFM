@@ -231,7 +231,7 @@
     $('#openCaptchaWindow').addEventListener('click', () => {
       if (!state.captchaToken || !state.jobId) { $('#captchaHint').textContent = 'Доступ к проверке утрачен. Запустите новый поиск.'; return; }
       const url = `/captcha.html?job=${encodeURIComponent(state.jobId)}`;
-      const popup = window.open(url, 'signal-yandex-captcha', 'popup=yes,width=1100,height=940,resizable=yes,scrollbars=yes');
+      const popup = window.open(url, 'signal-yandex-captcha', 'popup=yes,width=820,height=740,resizable=yes,scrollbars=yes');
       if (!popup) { $('#captchaHint').textContent = 'Разрешите всплывающие окна для этого сайта и нажмите кнопку ещё раз.'; return; }
       state.captchaWindow = popup;
       popup.focus();
