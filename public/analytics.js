@@ -5,7 +5,7 @@
   panel.className = 'card analytics-panel';
   panel.hidden = true;
   panel.innerHTML = `
-    <div class="analytics-head"><div><span class="workflow-kicker">АНАЛИТИКА / LIVE</span><h3>Скорость реагирования</h3><p id="analyticsQuery"></p></div><span id="analyticsStatus" role="status">Загрузка</span></div>
+    <div class="analytics-head"><div><span class="workflow-kicker">АНАЛИТИКА / В РЕАЛЬНОМ ВРЕМЕНИ</span><h3>Скорость реагирования</h3><p id="analyticsQuery"></p></div><span id="analyticsStatus" role="status">Загрузка</span></div>
     <div class="analytics-metrics">
       <div class="analytics-metric" id="spikeMetric"><span>От всплеска до уведомления</span><strong id="spikeTime">Не измерено</strong><small id="spikeState">Ожидание отметки всплеска</small><div class="analytics-track"><div id="spikeBar"></div></div><small>Шкала: 60 минут</small></div>
       <div class="analytics-metric" id="responseMetric"><span>От уведомления до реакции ведомства</span><strong id="responseTime">Не измерено</strong><small id="responseState">Ожидание отметки уведомления</small><div class="analytics-track"><div id="responseBar"></div></div><small>Шкала: 4 часа</small></div>

@@ -11,6 +11,12 @@
   let loading = false;
   let actions = Promise.resolve();
   let lastMove = 0;
+  const img = $('image');
+  img.addEventListener('load', () => $('screen').classList.add('ready'));
+  img.addEventListener('error', () => {
+    $('screen').classList.remove('ready');
+    $('loading').textContent = 'Не удалось показать изображение. Нажмите «Обновить изображение».';
+  });
   function closeAfterSuccess() {
     setHint('Яндекс принял ответ. Поиск продолжается в основной вкладке; это окно сейчас закроется.');
     setTimeout(() => window.close(), 1200);
@@ -59,7 +65,7 @@
     loading = true;
     try {
       const screenshot = await captchaRequest();
-      if (waiting && !dragging) { $('image').src = screenshot.image; setStatus('Ожидаем вашего ответа'); }
+      if (waiting && !dragging) { img.src = screenshot.image; setStatus('Ожидаем вашего ответа'); }
     } catch (error) {
       if (waiting) setHint(`Не удалось обновить изображение: ${error.message}`);
     } finally { loading = false; }
@@ -80,7 +86,7 @@
       } else if (job.status === 'running') {
         waiting = false;
         sessionStorage.removeItem(storageKey);
-        setStatus('CAPTCHA пройдена ✓', 'done');
+        setStatus('Проверка пройдена ✓', 'done');
         closeAfterSuccess();
       }
     } catch (error) { setHint(`Нет связи с поиском: ${error.message}`); }
@@ -97,15 +103,15 @@
   });
   if (!validJob) { waiting = false; setStatus('Некорректная задача', 'error'); setHint('Откройте окно кнопкой из активного поиска.'); return; }
   if (window.opener) window.opener.postMessage({ type: 'signal-captcha-ready', jobId }, location.origin);
-  if (!token) setHint('Получаем доступ к CAPTCHA от основной вкладки...');
+  if (!token) setHint('Получаем доступ к проверке от основной вкладки...');
 
-  const img = $('image');
   img.addEventListener('pointerdown', event => {
     if (!waiting || !token || !img.naturalWidth) return;
     event.preventDefault();
     img.setPointerCapture(event.pointerId);
     dragging = true;
     lastMove = 0;
+    setHint('Действие передаётся на страницу Яндекса. После выполнения задания нажмите «Отправить ответ».');
     send({ type: 'down', ...coords(event) });
   });
   img.addEventListener('pointermove', event => {
@@ -129,12 +135,18 @@
   $('type').addEventListener('click', async () => {
     const input = $('answer');
     if (!input.value) return;
-    try { await send({ type: 'text', value: input.value }); input.value = ''; setHint('Текст введён в окно Яндекса. Нажмите Enter, если нужно отправить ответ.'); }
+    try { await send({ type: 'text', value: input.value }); input.value = ''; setHint('Ответ введён на странице Яндекса. Нажмите «Отправить ответ».'); }
     catch { /* Сообщение об ошибке показывает send. */ }
   });
   $('answer').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); $('type').click(); } });
   for (const [id, key] of [['enter', 'Enter'], ['tab', 'Tab'], ['backspace', 'Backspace']]) {
-    $(id).addEventListener('click', () => send({ type: 'key', value: key }));
+    $(id).addEventListener('click', () => {
+      if (id === 'enter' && $('answer').value.trim()) {
+        setHint('Сначала нажмите «Ввести ответ», затем «Отправить ответ».');
+        return;
+      }
+      send({ type: 'key', value: key }).then(() => { if (id === 'enter') setHint('Ответ отправлен. Ожидаем результат проверки Яндекса…'); }).catch(() => {});
+    });
   }
   for (const [id, delta] of [['scrollUp', -500], ['scrollDown', 500]]) {
     $(id).addEventListener('click', () => send({ type: 'scroll', x: 500, y: 350, value: delta }));

@@ -9,23 +9,29 @@
 </head>
 <body>
   <header class="top">
-    <div><span class="brand">СИГНАЛ / ЯНДЕКС</span><h1>Подтвердите поиск</h1><p>Это изображение страницы Яндекса из браузера на Render. Нажимайте прямо по нему — действия передаются в поиск.</p></div>
+    <div><span class="brand">СИГНАЛ / ПРОВЕРКА ПОИСКА</span><h1>Помогите продолжить поиск</h1><p>Яндекс попросил подтвердить, что поиск выполняет человек. Проверка показана ниже.</p></div>
     <span id="status" class="status" role="status">Подключаемся...</span>
   </header>
   <main>
+    <ol class="steps" aria-label="Как пройти проверку">
+      <li><strong>Выберите поле на изображении</strong><span>Нажмите на поле ответа или выполните задание прямо на картинке.</span></li>
+      <li><strong>Введите ответ</strong><span>Напишите его ниже и нажмите «Ввести ответ».</span></li>
+      <li><strong>Подтвердите</strong><span>Нажмите «Отправить ответ». Поиск продолжится автоматически.</span></li>
+    </ol>
     <div class="toolbar">
       <button id="fit" type="button" aria-pressed="true">По ширине</button>
       <button id="fullSize" type="button" aria-pressed="false">Оригинальный размер</button>
       <button id="refresh" type="button">↻ Обновить изображение</button>
-      <span>Обновляется автоматически · для ползунка удерживайте и перетащите</span>
+      <span>Изображение обновляется само · ползунок можно перетаскивать мышью или пальцем</span>
     </div>
-    <div class="screen fit" id="screen"><img id="image" draggable="false" alt="Страница проверки Яндекса"></div>
+    <div class="screen fit" id="screen" aria-label="Изображение проверки Яндекса"><div id="loading" class="screen-loading" role="status">Загружаем изображение проверки…</div><img id="image" draggable="false" alt="Страница проверки Яндекса; нажмите на нужное поле или выполните задание"></div>
     <div class="controls">
-      <label for="answer">Текст с картинки (сначала нажмите на поле на изображении)</label>
-      <div class="action-row"><input id="answer" type="text" autocomplete="off" placeholder="Введите ответ здесь"><button id="type" type="button" class="primary">Ввести текст в Яндекс</button><button id="enter" type="button" class="primary">Нажать Enter</button></div>
-      <div class="action-row"><button id="tab" type="button">Tab — следующее поле</button><button id="backspace" type="button">⌫ Удалить символ</button><button id="scrollUp" type="button">↑ Прокрутить страницу</button><button id="scrollDown" type="button">↓ Прокрутить страницу</button></div>
+      <label for="answer">Ответ на проверку</label>
+      <div class="action-row"><input id="answer" type="text" autocomplete="off" placeholder="Напишите ответ с изображения" aria-describedby="answerHelp"><button id="type" type="button" class="primary">Ввести ответ</button><button id="enter" type="button">Отправить ответ ↗</button></div>
+      <small id="answerHelp">Перед вводом нажмите на поле ответа в изображении. Если нужно выбрать картинки или передвинуть ползунок, сделайте это прямо на изображении.</small>
+      <details class="extra-controls"><summary>Дополнительные действия</summary><div class="action-row"><button id="tab" type="button">Следующее поле</button><button id="backspace" type="button">⌫ Удалить символ</button><button id="scrollUp" type="button">↑ Прокрутить страницу</button><button id="scrollDown" type="button">↓ Прокрутить страницу</button></div></details>
     </div>
-    <p id="hint" role="alert">Подождите, пока загрузится проверка. После успешного ответа поиск продолжится в основной вкладке автоматически.</p>
+    <p id="hint" role="status" aria-live="polite">Подождите, пока загрузится проверка. После успешного ответа поиск продолжится в основной вкладке автоматически.</p>
   </main>
   <script src="captcha.js"></script>
 </body>

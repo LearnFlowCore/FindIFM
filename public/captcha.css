@@ -16,14 +16,26 @@ h1 { margin: 5px 0; font-size: 27px; }
 .status.done { background: #d9f7e8; color: #12633a; }
 .status.error { background: #ffe5e5; color: #9b2828; }
 main { padding: 18px clamp(14px, 4vw, 42px) 36px; }
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; list-style: none; counter-reset: step; margin: 0 0 18px; padding: 0; }
+.steps li { counter-increment: step; display: grid; gap: 5px; position: relative; padding: 16px 15px 16px 54px; background: #fff; border: 1px solid #d9e2ef; border-radius: 12px; }
+.steps li::before { content: counter(step); position: absolute; left: 14px; top: 15px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #e2edff; color: #245ecd; font-weight: 800; }
+.steps li span { color: #586781; font-size: 13px; line-height: 1.4; }
 .toolbar, .action-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .toolbar { margin-bottom: 14px; }
 .toolbar span { color: #52647e; }
-.screen { background: #dce4ef; border: 1px solid #c8d4e5; border-radius: 10px; min-height: 260px; overflow: auto; }
-.screen img { display: block; width: 1000px; height: auto; max-width: none; touch-action: none; user-select: none; cursor: crosshair; }
+.screen { position: relative; background: #dce4ef; border: 1px solid #c8d4e5; border-radius: 10px; min-height: 260px; overflow: auto; }
+.screen-loading { display: grid; place-items: center; min-height: 260px; color: #455976; font-weight: 700; text-align: center; padding: 20px; }
+.screen img { display: none; width: 1000px; height: auto; max-width: none; touch-action: none; user-select: none; cursor: crosshair; }
+.screen.ready img { display: block; }
+.screen.ready .screen-loading { display: none; }
 .screen.fit img { max-width: 100%; width: 1000px; }
 .controls { background: #fff; border-radius: 10px; margin-top: 15px; padding: 17px; display: grid; gap: 10px; }
 .controls label { font-weight: 700; }
 .controls input { min-width: 180px; flex: 1; padding: 10px; border: 1px solid #bfcce0; border-radius: 8px; }
-#hint { color: #455976; line-height: 1.5; }
+.controls small { color: #586781; line-height: 1.5; }
+.extra-controls { border-top: 1px solid #e1e7f0; padding-top: 11px; }
+.extra-controls summary { cursor: pointer; font-weight: 650; color: #245ecd; }
+.extra-controls .action-row { margin-top: 10px; }
+#hint { color: #455976; line-height: 1.5; padding: 13px 16px; background: #fff; border-radius: 9px; }
+@media (max-width: 760px) { .steps { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .top { align-items: flex-start; } .toolbar span { width: 100%; } .controls button { flex: 1 1 auto; } }
