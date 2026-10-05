@@ -3,9 +3,19 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { startServer } = require('../src/server');
+const vm = require('node:vm');
+const { startServer, highlightedHtml } = require('../src/server');
 const { openDatabase } = require('../src/db');
 const { summarize } = require('../public/dynamics');
+
+test('подсветка целой фразы экранирует спецсимволы и не портит HTML', () => {
+  const html = highlightedHtml('<html><body><p>C++ example</p></body></html>', 'https://example.org/', 'C++ example');
+  assert.equal((html.match(/<\/body>/g) || []).length, 1);
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(script);
+  const document = { body: {}, createTreeWalker: () => ({ nextNode: () => false }) };
+  assert.equal(vm.runInNewContext(script.replace(/\}\)\(\)$/, "return pattern.test('C++ example')})()"), { document, NodeFilter: { SHOW_TEXT: 4 } }), true);
+});
 
 test('сохранённые ссылки группируются по дате публикации и выбранному периоду', () => {
   assert.deepEqual(summarize([

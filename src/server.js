@@ -39,8 +39,8 @@ function remoteUrlAllowed(value) {
 function highlightedHtml(html, url, query) {
   const terms = highlightTerms(query);
   const payload = JSON.stringify(terms).replace(/<\//g, '<\\/');
-  const injection = `<base href="${String(url).replace(/"/g, '&quot;')}"><style>mark.signal-hit{background:#ffe66d;color:inherit;padding:0 .08em;border-radius:.16em;box-shadow:0 0 0 1px #f4c43055}</style><script>(function(){const terms=${payload};if(!terms.length)return;const pattern=new RegExp('('+terms.map(x=>x.replace(/[\\^$.*+?()[\\]{}|]/g,'\\\\$&')).join('|')+')','giu');const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);const nodes=[];while(walker.nextNode())if(!/^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|INPUT)$/i.test(walker.currentNode.parentElement?.tagName||''))nodes.push(walker.currentNode);for(const node of nodes){const value=node.nodeValue;if(!pattern.test(value)){pattern.lastIndex=0;continue}pattern.lastIndex=0;const fragment=document.createDocumentFragment();let last=0;value.replace(pattern,(hit,_,offset)=>{fragment.append(document.createTextNode(value.slice(last,offset)));const mark=document.createElement('mark');mark.className='signal-hit';mark.textContent=hit;fragment.append(mark);last=offset+hit.length;return hit});fragment.append(document.createTextNode(value.slice(last)));node.replaceWith(fragment)}})()</script>`;
-  if (/<body\b[^>]*>/i.test(html)) return html.replace(/<\/body>/i, `${injection}</body>`);
+  const injection = `<base href="${String(url).replace(/"/g, '&quot;')}"><style>mark.signal-hit{background:#ffe66d;color:inherit;padding:0 .08em;border-radius:.16em;box-shadow:0 0 0 1px #f4c43055}</style><script>(function(){const terms=${payload};if(!terms.length)return;const pattern=new RegExp('('+terms.map(x=>x.replace(/[.*+?^\${}()|[\\]\\\\]/g,'\\\\$&')).join('|')+')','giu');const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);const nodes=[];while(walker.nextNode())if(!/^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|INPUT)$/i.test(walker.currentNode.parentElement?.tagName||''))nodes.push(walker.currentNode);for(const node of nodes){const value=node.nodeValue;if(!pattern.test(value)){pattern.lastIndex=0;continue}pattern.lastIndex=0;const fragment=document.createDocumentFragment();let last=0;value.replace(pattern,(hit,_,offset)=>{fragment.append(document.createTextNode(value.slice(last,offset)));const mark=document.createElement('mark');mark.className='signal-hit';mark.textContent=hit;fragment.append(mark);last=offset+hit.length;return hit});fragment.append(document.createTextNode(value.slice(last)));node.replaceWith(fragment)}})()</script>`;
+  if (/<body\b[^>]*>/i.test(html)) return html.replace(/<\/body>/i, () => `${injection}</body>`);
   return `${injection}${html}`;
 }
 
@@ -340,4 +340,4 @@ if (require.main === module) {
   process.on('SIGTERM', shutdown);
 }
 
-module.exports = { startServer };
+module.exports = { startServer, highlightedHtml };
