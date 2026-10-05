@@ -9,6 +9,7 @@
     <div class="analytics-metrics">
       <div class="analytics-metric" id="spikeMetric"><span>От всплеска до уведомления</span><strong id="spikeTime">Не измерено</strong><small id="spikeState">Ожидание отметки всплеска</small><div class="analytics-track"><div id="spikeBar"></div></div><small>Шкала: 60 минут</small></div>
       <div class="analytics-metric" id="responseMetric"><span>От уведомления до реакции ведомства</span><strong id="responseTime">Не измерено</strong><small id="responseState">Ожидание отметки уведомления</small><div class="analytics-track"><div id="responseBar"></div></div><small>Шкала: 4 часа</small></div>
+      <div class="analytics-metric mttr-metric"><span>MTTR · всплеск → реакция</span><strong id="mttrValue">Не измерено</strong><small id="mttrSample">Нет завершённых случаев</small><small id="mttrCurrent"></small></div>
     </div>
     <div class="analytics-chart" aria-label="График этапов от всплеска до реакции">
       <div class="analytics-chart-heading"><strong>График этапов</strong><span>Красный — всплеск · янтарный — уведомление · зелёный — реакция</span></div>
@@ -75,6 +76,10 @@
       $(stage.card).classList.toggle('measured', Boolean(stage.start && stage.end));
       $(stage.bar).style.width = `${elapsed === null ? 0 : Math.min(100, elapsed / stage.seconds * 100)}%`;
     }
+    $('#mttrValue').textContent = duration(data.mttr?.averageSeconds ?? null);
+    $('#mttrSample').textContent = data.mttr?.cases ? `Среднее по ${data.mttr.cases} случаям` : 'Нет случаев с обеими отметками';
+    const elapsedFromSpike = data.spikeAt ? Math.max(0, Math.floor((Date.parse(data.responseAt || new Date().toISOString()) - Date.parse(data.spikeAt)) / 1000)) : null;
+    $('#mttrCurrent').textContent = elapsedFromSpike === null ? 'Отметьте начало всплеска' : `${data.responseAt ? 'Этот случай' : 'Сейчас, до реакции'}: ${duration(elapsedFromSpike)}`;
     const spike = data.spikeAt ? Date.parse(data.spikeAt) : null;
     const notice = data.notifiedAt ? Date.parse(data.notifiedAt) : null;
     const reaction = data.responseAt ? Date.parse(data.responseAt) : null;

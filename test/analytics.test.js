@@ -7,7 +7,7 @@ const { DatabaseSync } = require('node:sqlite');
 const { startServer } = require('../src/server');
 const { openDatabase } = require('../src/db');
 const { Repository } = require('../src/repository');
-const { metrics } = require('../src/analytics');
+const { metrics, mttrSummary } = require('../src/analytics');
 
 test('существующая история поиска получает колонки аналитики без потери запусков', () => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'signal-analytics-migration-'));
@@ -38,6 +38,16 @@ test('два интервала не зависят от фиксации дру
   assert.deepEqual(metrics(times), { spikeToNotificationSeconds: null, notificationToResponseSeconds: 13860 });
 });
 
+test('MTTR усредняет только случаи с всплеском и реакцией в правильном порядке', () => {
+  assert.deepEqual(mttrSummary([
+    { spike_at: '2026-10-04T09:00:00Z', response_at: '2026-10-04T09:10:00Z' },
+    { spike_at: '2026-10-04T09:00:00Z', response_at: '2026-10-04T09:30:00Z' },
+    { spike_at: null, response_at: '2026-10-04T09:30:00Z' },
+    { spike_at: '2026-10-04T09:30:00Z', response_at: '2026-10-04T09:00:00Z' },
+  ]), { cases: 2, averageSeconds: 1200 });
+  assert.deepEqual(mttrSummary([]), { cases: 0, averageSeconds: null });
+});
+
 test('аналитика запуска переживает рестарт и отклоняет обратный порядок дат', async () => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'signal-analytics-'));
   let service;
@@ -55,7 +65,9 @@ test('аналитика запуска переживает рестарт и �
       { spikeToNotificationSeconds: 600, notificationToResponseSeconds: null });
     response = await update({ responseAt: '2026-10-04T09:40:00Z' });
     assert.equal(response.status, 200);
-    assert.equal((await response.json()).notificationToResponseSeconds, 1800);
+    const measured = await response.json();
+    assert.equal(measured.notificationToResponseSeconds, 1800);
+    assert.deepEqual(measured.mttr, { cases: 1, averageSeconds: 2400 });
     response = await update({ responseAt: '2026-10-04T09:05:00Z' });
     assert.equal(response.status, 400);
     await response.json();
@@ -68,6 +80,20 @@ test('аналитика запуска переживает рестарт и �
     const saved = await fetch(`${service.url}/api/analytics/analytics-job`).then(r => r.json());
     assert.equal(saved.spikeToNotificationSeconds, 600);
     assert.equal(saved.notificationToResponseSeconds, 1800);
+    assert.deepEqual(saved.mttr, { cases: 1, averageSeconds: 2400 });
+    const extraDb = openDatabase(service.config.dbPath);
+    new Repository(extraDb).addHistory('second-job', { original: 'второй запрос', extractedDate: null, period: null, from: null, to: null, whitelist: [], blacklist: [] });
+    extraDb.close();
+    response = await fetch(`${service.url}/api/analytics/second-job`, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ spikeAt: '2026-10-04T10:00:00Z', responseAt: '2026-10-04T10:20:00Z' }) });
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).mttr, { cases: 2, averageSeconds: 1800 });
+    response = await fetch(`${service.url}/api/analytics/analytics-job`);
+    assert.deepEqual((await response.json()).mttr, { cases: 2, averageSeconds: 1800 });
+    response = await fetch(`${service.url}/api/analytics/second-job`, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ responseAt: '2026-10-04T09:00:00Z' }) });
+    assert.equal(response.status, 400);
+    await response.json();
     response = await fetch(`${service.url}/api/analytics/missing-job`);
     assert.equal(response.status, 404);
     await response.json();

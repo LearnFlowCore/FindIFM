@@ -112,6 +112,9 @@ class Repository {
   analyticsSummary(jobId) {
     return this.db.prepare('SELECT COUNT(*) AS publications, COUNT(DISTINCT domain) AS sources FROM results WHERE job_id=?').get(jobId);
   }
+  mttrRuns() {
+    return this.db.prepare('SELECT spike_at, response_at FROM search_history WHERE spike_at IS NOT NULL AND response_at IS NOT NULL').all();
+  }
   presets() { return this.db.prepare('SELECT * FROM domain_presets ORDER BY name').all(); }
   savePreset(preset, oldName = null) {
     const domains = Array.isArray(preset.domains) ? preset.domains : [...(preset.whitelist || []), ...(preset.blacklist || [])];

@@ -29,5 +29,11 @@ function metrics({ spikeAt, notifiedAt, responseAt }) {
     notificationToResponseSeconds: interval(notifiedAt, responseAt),
   };
 }
+function mttrSummary(runs) {
+  const measured = runs.map(run => interval(run.spike_at ?? run.spikeAt, run.response_at ?? run.responseAt))
+    .filter(seconds => seconds !== null);
+  return { cases: measured.length,
+    averageSeconds: measured.length ? Math.round(measured.reduce((total, seconds) => total + seconds, 0) / measured.length) : null };
+}
 
-module.exports = { parseEventTimes, metrics };
+module.exports = { parseEventTimes, metrics, mttrSummary };

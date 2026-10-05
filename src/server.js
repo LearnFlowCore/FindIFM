@@ -200,24 +200,25 @@ async function startServer(options = {}) {
   app.get('/api/analytics/:id', (req, res) => {
     const run = repo.historyById(req.params.id);
     if (!run) return res.status(404).json({ error: 'Поисковый запуск не найден.' });
-    const { metrics } = require('./analytics');
+    const { metrics, mttrSummary } = require('./analytics');
     return res.json({ jobId: run.job_id, query: run.query, status: run.status, resultsCount: run.results_count,
       sourcesCount: repo.analyticsSummary(run.job_id).sources,
-      spikeAt: run.spike_at, notifiedAt: run.notified_at, responseAt: run.response_at, ...metrics({ spikeAt: run.spike_at, notifiedAt: run.notified_at, responseAt: run.response_at }) });
+      spikeAt: run.spike_at, notifiedAt: run.notified_at, responseAt: run.response_at, ...metrics({ spikeAt: run.spike_at, notifiedAt: run.notified_at, responseAt: run.response_at }), mttr: mttrSummary(repo.mttrRuns()) });
   });
   app.put('/api/analytics/:id', requireBody, (req, res) => {
     const run = repo.historyById(req.params.id);
     if (!run) return res.status(404).json({ error: 'Поисковый запуск не найден.' });
-    const { parseEventTimes, metrics } = require('./analytics');
+    const { parseEventTimes, metrics, mttrSummary } = require('./analytics');
     const changes = parseEventTimes(req.body);
     if (!Object.keys(changes).length) return res.status(400).json({ error: 'Укажите время всплеска, уведомления или реакции.' });
     const merged = { spikeAt: run.spike_at, notifiedAt: run.notified_at, responseAt: run.response_at, ...changes };
     if (merged.spikeAt && merged.notifiedAt && Date.parse(merged.notifiedAt) < Date.parse(merged.spikeAt)) return res.status(400).json({ error: 'Уведомление не может предшествовать всплеску.' });
     if (merged.notifiedAt && merged.responseAt && Date.parse(merged.responseAt) < Date.parse(merged.notifiedAt)) return res.status(400).json({ error: 'Реакция не может предшествовать уведомлению.' });
+    if (merged.spikeAt && merged.responseAt && Date.parse(merged.responseAt) < Date.parse(merged.spikeAt)) return res.status(400).json({ error: 'Реакция не может предшествовать всплеску.' });
     repo.updateAnalytics(run.job_id, changes);
     return res.json({ jobId: run.job_id, query: run.query, status: run.status, resultsCount: run.results_count,
       sourcesCount: repo.analyticsSummary(run.job_id).sources,
-      ...merged, ...metrics(merged) });
+      ...merged, ...metrics(merged), mttr: mttrSummary(repo.mttrRuns()) });
   });
   app.post('/api/history/:id/rerun', asyncRoute(async (req, res) => {
     const previous = repo.historyById(req.params.id);
@@ -280,7 +281,7 @@ async function startServer(options = {}) {
     const file = `report_${new Date().toISOString().replace(/[:.]/g, '-')}_${crypto.randomBytes(4).toString('hex')}.${format}`;
     const destination = path.join(exportRoot, file);
     if (format === 'xlsx') await exportXlsx(rows, destination);
-    else if (format === 'csv') exportCsv(rows, destination);
+    else if (format === 'csv') exportCsv(rows, destination, { full: true });
     else exportTxt(rows, destination);
     return res.json({ file, count: rows.length, url: `/exports/${encodeURIComponent(file)}${token ? `?token=${encodeURIComponent(token)}` : ''}` });
   }));
@@ -300,7 +301,7 @@ async function startServer(options = {}) {
     const base = `results_query-date_${stamp}`;
     const xlsx = `${base}.xlsx`; const csv = `${base}.csv`;
     await exportXlsx(selection.rows, path.join(exportRoot, xlsx));
-    exportCsv(selection.rows, path.join(exportRoot, csv));
+    exportCsv(selection.rows, path.join(exportRoot, csv), { full: true });
     notify('completed', `Выгрузка по дате запроса сохранена: ${selection.rows.length} ссылок`);
     const link = file => `/exports/${encodeURIComponent(file)}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
     return res.json({ query: selection.query, extractedDate: selection.extractedDate, from: selection.from, to: selection.to,

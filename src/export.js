@@ -27,10 +27,19 @@ async function exportXlsx(rows, filename) {
   await workbook.xlsx.writeFile(filename);
   return filename;
 }
-function csvCell(value) { return `"${String(value ?? '').replaceAll('"', '""')}"`; }
-function exportCsv(rows, filename) {
-  const headers = ['URL', 'Заголовок страницы', 'Дата публикации', 'Краткое описание'];
-  const lines = [headers, ...rows.map(row => [row.url, row.title, row.date, row.description])]
+function csvCell(value) {
+  let text = String(value ?? '');
+  if (/^\s*[=+@-]/.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
+}
+function exportCsv(rows, filename, { full = false } = {}) {
+  const fields = full
+    ? [['url', 'URL'], ['domain', 'Домен'], ['title', 'Заголовок'], ['date', 'Дата'],
+      ['description', 'Описание'], ['status', 'Статус'], ['query', 'Запрос'],
+      ['search_date', 'Дата поиска'], ['search_run_date', 'Дата запуска поиска'],
+      ['category', 'Категория'], ['text_length', 'Длина текста'], ['has_media', 'Есть медиа']]
+    : [['url', 'URL'], ['title', 'Заголовок страницы'], ['date', 'Дата публикации'], ['description', 'Краткое описание']];
+  const lines = [fields.map(([, label]) => label), ...rows.map(row => fields.map(([key]) => row[key]))]
     .map(row => row.map(csvCell).join(';'));
   require('node:fs').writeFileSync(filename, `\uFEFF${lines.join('\r\n')}\r\n`, 'utf8');
   return filename;
