@@ -185,6 +185,11 @@ async function startServer(options = {}) {
     if (jobId && !run) return res.status(404).json({ error: 'Поисковый запуск не найден.' });
     return res.json(repo.resultDynamics({ jobId: run?.job_id, from, to }));
   });
+  app.get('/api/analytics/voice', (req, res) => {
+    const { from, to } = req.query;
+    if (!validPeriodDate(from) || !validPeriodDate(to) || (from && to && from > to)) return res.status(400).json({ error: 'Укажите корректный период.' });
+    return res.json({ groups: repo.voiceGroups({ from, to }) });
+  });
   app.post('/api/semantic/summary', requireBody, asyncRoute(async (req, res) => {
     if (!semantic.configured()) return res.status(503).json({ error: 'Языковая модель пока не настроена: нужен AI_API_KEY на сервере.' });
     const run = req.body.jobId ? repo.historyById(req.body.jobId) : null;

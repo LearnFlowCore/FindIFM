@@ -95,6 +95,14 @@ class Repository {
     const points = this.db.prepare(`SELECT date AS day, COUNT(*) AS count FROM results WHERE ${where.join(' AND ')} GROUP BY date ORDER BY date`).all(...args);
     return { points, total: points.reduce((sum, point) => sum + point.count, 0) };
   }
+  voiceGroups({ from, to } = {}) {
+    const where = ["query IS NOT NULL", "TRIM(query)<>''", "url IS NOT NULL", "TRIM(url)<>''"], args = [];
+    if (from) { where.push("date IS NOT NULL AND date>=?"); args.push(from); }
+    if (to) { where.push("date IS NOT NULL AND date<=?"); args.push(to); }
+    return this.db.prepare(`SELECT query, COUNT(DISTINCT COALESCE(NULLIF(url_normalized,''),url)) AS mentions,
+      COUNT(DISTINCT NULLIF(domain,'')) AS sources
+      FROM results WHERE ${where.join(' AND ')} GROUP BY query ORDER BY query COLLATE NOCASE`).all(...args);
+  }
   resultsByQueryDate(jobId) {
     const history = this.db.prepare('SELECT * FROM search_history WHERE job_id=?').get(jobId);
     if (!history?.extracted_date) throw new Error('В текущем поисковом запросе не указана дата.');

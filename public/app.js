@@ -7,7 +7,7 @@
   window.signalAppToken = appToken;
   if (location.hash) history.replaceState(null, '', `${location.pathname}${location.search}`);
   const state = { tab: 'search', jobId: null, captchaToken: null, searching: false, page: 1, pageSize: 200, sort: 'search_date', order: 'desc', results: [], resultGroups: [], total: 0, resultsRequest: 0, history: [], saved: [], savedSelected: null, savedPage: 1, presets: [], settings: {} };
-  const labels = { search: 'Новый поиск', results: 'Результаты', history: 'История запусков', saved: 'Сохранённые поиски', admin: 'Управление задачами', settings: 'Настройки' };
+  const labels = { search: 'Новый поиск', results: 'Результаты', history: 'История запусков', voice: 'Сравнение министерств', saved: 'Сохранённые поиски', admin: 'Управление задачами', settings: 'Настройки' };
   labels.search = localStorage.getItem('signal-document-name') || labels.search;
   $('#pageTitle').textContent = labels.search;
   function setupDocumentTitle() {
@@ -37,7 +37,8 @@
   }
   const api = async (url, options = {}) => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30000);
+    const timeoutSeconds = 90;
+    const timer = setTimeout(() => controller.abort(), timeoutSeconds * 1000);
     let res;
     try {
       res = await fetch(url, {
@@ -47,7 +48,7 @@
       });
     } catch (error) {
       clearTimeout(timer);
-      throw new Error(error.name === 'AbortError' ? 'API не ответил за 30 секунд.' : `Ошибка соединения с API: ${error.message}`);
+      throw new Error(error.name === 'AbortError' ? `API не ответил за ${timeoutSeconds} секунд. Проверьте соединение и повторите запрос.` : `Ошибка соединения с API: ${error.message}`);
     }
     clearTimeout(timer);
     if (res.status === 204) return null;

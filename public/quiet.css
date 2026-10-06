@@ -241,3 +241,21 @@ tbody tr:hover { background: #f6f8ff; }
   .table-wrap, .date-export-table { -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
   .captcha-warning { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
 }
+
+.voice-panel { display: grid; gap: 18px; }
+.voice-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.voice-filters .field { min-width: 170px; }
+.voice-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
+.voice-choices label { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; padding: 8px 11px; background: #f1f4f0; border-radius: 8px; overflow-wrap: anywhere; }
+.voice-summary { font-weight: 700; }
+.voice-rows { display: grid; gap: 12px; }
+.voice-card { min-width: 0; padding: 16px; border: 1px solid #dce5dd; border-radius: 12px; }
+.voice-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; overflow-wrap: anywhere; }
+.voice-heading b { color: #197c67; white-space: nowrap; }
+.voice-track { height: 9px; margin-top: 12px; border-radius: 9px; background: #e7eee8; overflow: hidden; }
+.voice-track span { display: block; height: 100%; background: #239780; }
+.voice-reach-form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-top: 14px; }
+.voice-reach-form label { display: grid; gap: 5px; min-width: 0; }
+.voice-reach-form input { width: 175px; max-width: 100%; padding: 9px; border: 1px solid #cad7cb; border-radius: 7px; }
+.voice-message { color: #597168; }
+@media (max-width: 480px) { .voice-reach-form label, .voice-reach-form input { width: 100%; } }
