@@ -19,7 +19,7 @@ function passesContentFilters(page, query) {
   if (query.maxTextLength && length > query.maxTextLength) return false;
   if (query.media === 'present' && !page.hasMedia) return false;
   if (query.media === 'absent' && page.hasMedia) return false;
-  if (query.sentiment !== 'any' && (page.sentiment || classifySentiment(`${page.title || ''} ${page.text || ''} ${page.description || ''}`)) !== query.sentiment) return false;
+  if (query.sentiment && query.sentiment !== 'any' && (page.sentiment || classifySentiment(`${page.title || ''} ${page.text || ''} ${page.description || ''}`)) !== query.sentiment) return false;
   return true;
 }
 

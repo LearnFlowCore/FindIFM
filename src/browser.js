@@ -95,9 +95,9 @@ class YandexBrowser {
   }
   async waitForResults(page, settings, onCaptcha, hooks = {}) {
     const handleCaptcha = async () => {
-      if (settings.captchaStrategy === 'skip') throw new CaptchaError('Яндекс запросил CAPTCHA; поиск остановлен.');
       if (settings.captchaStrategy === 'manual') this.captchaPage = page;
       onCaptcha?.();
+      if (settings.captchaStrategy === 'skip') throw new CaptchaError('Яндекс запросил CAPTCHA; поиск остановлен.');
       const expiresAt = settings.captchaStrategy === 'manual' ? Date.now() + 15 * 60000 : Infinity;
       try {
         while (page && !page.isClosed()) {
