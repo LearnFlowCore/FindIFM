@@ -94,28 +94,37 @@ class YandexBrowser {
     return state.captcha || /captcha|showcaptcha|подтвердите/i.test(`${state.url} ${state.title}`);
   }
   async waitForResults(page, settings, onCaptcha, hooks = {}) {
-    await sleep(2500);
+    const handleCaptcha = async () => {
+      if (settings.captchaStrategy === 'skip') throw new CaptchaError('Яндекс запросил CAPTCHA; поиск остановлен.');
+      if (settings.captchaStrategy === 'manual') this.captchaPage = page;
+      onCaptcha?.();
+      const expiresAt = settings.captchaStrategy === 'manual' ? Date.now() + 15 * 60000 : Infinity;
+      try {
+        while (page && !page.isClosed()) {
+          if (hooks.isCancelled?.()) throw new Error('Поиск остановлен пользователем');
+          if (Date.now() >= expiresAt) throw new CaptchaError('Время ручного подтверждения CAPTCHA истекло (15 минут).', 'CAPTCHA_TIMEOUT');
+          await sleep(2000);
+          if (!(await this.isCaptcha(page))) { hooks.onCaptchaSolved?.(); return true; }
+        }
+        throw new CaptchaError('Окно CAPTCHA закрыто до подтверждения.');
+      } finally { if (this.captchaPage === page) this.captchaPage = null; }
+    };
+    // CAPTCHA is identifiable as soon as the DOM navigation completes. Keep a
+    // short second check for slower redirects without delaying the common path.
+    if (await this.isCaptcha(page)) return handleCaptcha();
+    await sleep(800);
     if (!(await this.isCaptcha(page))) return true;
-    onCaptcha?.();
-    if (settings.captchaStrategy === 'skip') throw new CaptchaError('Яндекс запросил CAPTCHA; поиск остановлен.');
-    if (settings.captchaStrategy === 'manual') this.captchaPage = page;
-    const expiresAt = settings.captchaStrategy === 'manual' ? Date.now() + 15 * 60000 : Infinity;
-    try {
-      while (page && !page.isClosed()) {
-        if (hooks.isCancelled?.()) throw new Error('Поиск остановлен пользователем');
-        if (Date.now() >= expiresAt) throw new CaptchaError('Время ручного подтверждения CAPTCHA истекло (15 минут).', 'CAPTCHA_TIMEOUT');
-        await sleep(2000);
-        if (!(await this.isCaptcha(page))) { hooks.onCaptchaSolved?.(); return true; }
-      }
-      throw new CaptchaError('Окно CAPTCHA закрыто до подтверждения.');
-    } finally { if (this.captchaPage === page) this.captchaPage = null; }
+    return handleCaptcha();
   }
   async captchaScreenshot() {
     const page = this.captchaPage;
     if (!page || page.isClosed()) throw new Error('Окно CAPTCHA уже недоступно.');
-    const image = await page.screenshot({ type: 'jpeg', quality: 70 });
+    const [image, cookieConsent] = await Promise.all([
+      page.screenshot({ type: 'jpeg', quality: 65 }),
+      this.captchaCookieConsent(),
+    ]);
     return { image: `data:image/jpeg;base64,${image.toString('base64')}`, width: page.viewport().width, height: page.viewport().height,
-      cookieConsent: await this.captchaCookieConsent() };
+      cookieConsent };
   }
   async captchaCookieConsent(accept = false) {
     const page = this.captchaPage;

@@ -23,7 +23,7 @@
       $('cookieOverlay').hidden = true;
       $('cookieStatus').textContent = '';
       setHint('Согласие передано Яндексу. Теперь можно пройти CAPTCHA.');
-      setTimeout(refreshImage, 500);
+      refreshImage();
     } catch (error) { $('cookieStatus').textContent = error.message; }
     finally { $('acceptCookies').disabled = false; }
   });
@@ -153,7 +153,7 @@
   img.addEventListener('wheel', event => {
     if (!waiting || !token || !img.naturalWidth) return;
     event.preventDefault();
-    send({ type: 'scroll', ...coords(event), value: event.deltaY });
+    send({ type: 'scroll', ...coords(event), value: event.deltaY }).then(() => setTimeout(refreshImage, 250)).catch(() => {});
   }, { passive: false });
 
   $('type').addEventListener('click', async () => {
@@ -180,7 +180,7 @@
     });
   }
   for (const [id, delta] of [['scrollUp', -500], ['scrollDown', 500]]) {
-    $(id).addEventListener('click', () => send({ type: 'scroll', x: 500, y: 350, value: delta }));
+    $(id).addEventListener('click', () => send({ type: 'scroll', x: 500, y: 350, value: delta }).then(() => setTimeout(refreshImage, 250)).catch(() => {}));
   }
   $('refresh').addEventListener('click', refreshImage);
   for (const [id, fit] of [['fit', true], ['fullSize', false]]) {
@@ -193,5 +193,4 @@
   checkJob();
   refreshImage();
   setInterval(checkJob, 2000);
-  setInterval(refreshImage, 1600);
 }());
