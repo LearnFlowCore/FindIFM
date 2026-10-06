@@ -14,7 +14,7 @@
       <button class="button primary" type="submit">Сформировать</button>
     </form>
     <section class="report-progress" hidden role="status" aria-live="polite"><div class="report-loader" aria-hidden="true"></div><strong>Формируем отчёт…</strong><p>Подбираем ссылки за указанный период и готовим файл для скачивания.</p><span id="reportElapsed">Прошло: 0 с</span></section>
-    <section class="report-done" hidden role="status" aria-live="polite"><strong>Отчёт успешно сформирован</strong><p id="reportCount"></p><a id="reportDownload" class="button primary" download>↓ Скачать</a><button type="button" class="button secondary" id="reportAgain">Другой отчёт</button></section>
+     <section class="report-done" hidden role="status" aria-live="polite"><strong>Отчёт успешно сформирован</strong><p id="reportCount"></p><p id="reportPeriod" class="report-period"></p><a id="reportDownload" class="button primary" download>↓ Скачать</a><button type="button" class="button secondary" id="reportAgain">Другой отчёт</button></section>
     <p id="reportError" class="report-error" role="alert" hidden></p>
   </div>`;
   document.body.append(overlay);
@@ -63,7 +63,8 @@
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Не удалось сформировать отчёт.');
       if (overlay.hidden || controller !== currentController) return;
-      $('#reportCount').textContent = `Найдено ссылок: ${result.count}. Файл: ${result.file}`;
+       $('#reportCount').textContent = `Найдено ссылок: ${result.count}. Файл: ${result.file}`;
+       $('#reportPeriod').textContent = from || to ? `Дата публикации: ${from || 'начало'} — ${to || 'конец'}` : 'Период публикаций: без ограничения';
       $('#reportDownload').href = result.url;
       $('#reportDownload').download = result.file;
       stage(3);

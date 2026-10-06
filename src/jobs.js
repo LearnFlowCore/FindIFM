@@ -77,8 +77,8 @@ class JobManager {
           if (!validHttpUrl(item.url)) return;
           job.liveMatches += 1;
           if (job.liveResults.length >= 200) return;
-          job.liveResults.push({ url: item.url, domain: new URL(item.normalized).hostname.replace(/^www\./, ''),
-            title: String(item.title || item.url).slice(0, 250), date: item.date || null,
+           job.liveResults.push({ url: item.url, domain: new URL(item.normalized).hostname.replace(/^www\./, ''),
+             title: String(item.title || item.url).slice(0, 250), date: item.date || item.dateText || null,
             description: String(item.description || item.snippet || '').slice(0, 1200),
             category: item.category || '', text_length: Number(item.textLength || item.text?.length || 0),
             has_media: item.hasMedia ? 1 : 0, status: 'Предварительно', query: query.original });
@@ -108,7 +108,7 @@ class JobManager {
         const status = duplicate || contentDuplicate ? 'уже найден ранее' : item.snippetMatch ? 'совпадение по сниппету' : item.date ? 'новый' : 'дата не определена';
         rows.push({
           url: item.url, urlNormalized: item.normalized, domain: new URL(item.normalized).hostname.replace(/^www\./, ''),
-          title: cleanText(item.title || item.url), date: item.date || null, description: normalizePrices(item.description || item.snippet).slice(0, 2000),
+           title: cleanText(item.title || item.url), date: item.date || item.dateText || null, description: normalizePrices(item.description || item.snippet).slice(0, 2000),
           query: query.original, searchDate: now, searchRunDate: now, status, snippetMatch: item.snippetMatch ? 1 : 0,
           category: item.category || '', textLength: Number(item.textLength || item.text?.length || 0), hasMedia: item.hasMedia ? 1 : 0,
           evidence: item.evidence || '', semanticScore: item.semanticScore ?? null,

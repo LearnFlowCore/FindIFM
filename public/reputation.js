@@ -69,7 +69,7 @@
       link.textContent = row.title || row.url;
       title.append(link);
       const site = document.createElement('td'); site.textContent = row.domain || '';
-      const date = document.createElement('td'); date.textContent = row.date || '—';
+     const date = document.createElement('td'); date.textContent = row.date || row.dateText || 'Дата не определена';
       tr.append(title, site, date);
       return tr;
     }));

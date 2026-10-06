@@ -205,6 +205,7 @@ tbody tr:hover { background: #f6f8ff; }
 .save-results-kicker { color: #aeb8ff; }
 .danger-zone { background: #fff7f8; border-color: #f1dce1; }
 .modal { border-radius: 12px; }
+.report-period { color: var(--muted); font-size: 13px; }
 
 @media (max-width: 800px) {
   .sidebar { width: 100%; padding: 16px 15px 10px; }
