@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
   <title>Подтверждение Яндекса · Сигнал</title>
   <link rel="stylesheet" href="captcha.css">
@@ -14,7 +14,7 @@
   </div></header>
   <main>
     <p class="captcha-intro">Коснитесь задания на изображении. Для ответа словами выберите поле на изображении и введите текст ниже.</p>
-    <div class="screen fit" id="screen" aria-label="Изображение проверки Яндекса"><div id="loading" class="screen-loading" role="status">Загружаем изображение проверки…</div><img id="image" draggable="false" alt="Страница проверки Яндекса; нажмите на нужное поле или выполните задание"></div>
+    <div class="screen fit" id="screen" aria-label="Изображение проверки Яндекса"><div id="loading" class="screen-loading" role="status">Загружаем изображение проверки…</div><img id="image" draggable="false" alt="Страница проверки Яндекса; нажмите на нужное поле или выполните задание"><div id="submitFeedback" class="submit-feedback" role="status" aria-live="polite" hidden><span class="submit-spinner" aria-hidden="true"></span><strong id="submitMessage">Передаём ответ Яндексу…</strong></div></div>
     <details class="view-options"><summary>Масштаб и обновление изображения</summary><div class="toolbar">
       <button id="fit" type="button" aria-pressed="true">По ширине</button>
       <button id="fullSize" type="button" aria-pressed="false">Оригинальный размер</button>

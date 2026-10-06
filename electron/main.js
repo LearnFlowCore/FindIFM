@@ -52,8 +52,17 @@ async function createApplication() {
     host: '127.0.0.1',
     port: 0,
     token,
-    notify: message => {
-      if (Notification.isSupported()) new Notification({ title: 'Сигнал', body: message, icon: appIcon }).show();
+    notify: (message, event) => {
+      if (Notification.isSupported()) {
+        const notification = new Notification({ title: event === 'captcha' ? 'Сигнал · Пройдите CAPTCHA' : 'Сигнал', body: message, icon: appIcon });
+        if (event === 'captcha') notification.on('click', () => {
+          if (!mainWindow || mainWindow.isDestroyed()) return;
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          mainWindow.show();
+          mainWindow.focus();
+        });
+        notification.show();
+      }
     },
   });
 

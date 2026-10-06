@@ -4,10 +4,11 @@ class NotificationService {
   constructor(repo, desktop, logger) { this.repo = repo; this.desktop = desktop; this.log = logger; }
   async send(event, message) {
     const settings = this.repo.settings();
-    const enabled = event === 'failed' ? settings.notifyOnError : event === 'new-data' ? settings.notifyOnNewData : settings.notifyOnFinish;
+    const enabled = event === 'captcha' ? settings.notifyOnCaptcha !== false
+      : event === 'failed' ? settings.notifyOnError : event === 'new-data' ? settings.notifyOnNewData : settings.notifyOnFinish;
     if (!enabled) return;
     const attempts = [];
-    if (settings.notifications !== false && this.desktop) attempts.push(Promise.resolve().then(() => this.desktop(message)));
+    if (settings.notifications !== false && this.desktop) attempts.push(Promise.resolve().then(() => this.desktop(message, event)));
     if (settings.telegramEnabled && settings.telegramBotToken && settings.telegramChatId) attempts.push(this.telegram(settings, message));
     if (settings.emailEnabled && settings.emailHost && settings.emailTo) attempts.push(this.email(settings, message));
     const results = await Promise.allSettled(attempts);

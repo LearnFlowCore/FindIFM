@@ -213,3 +213,31 @@ tbody tr:hover { background: #f6f8ff; }
   .main-content { padding: 22px 15px 52px; }
   .topbar { margin-bottom: 30px; }
 }
+
+/* На узком экране двигаются только навигация и широкие таблицы, не вся страница. */
+@media (max-width: 800px) {
+  html, body, .app-shell, .sidebar, .main-content { width: 100%; max-width: 100%; overflow-x: clip; }
+  .main-content > .view, .main-content > .topbar, .quiet-group, .card, .table-card { min-width: 0; max-width: 100%; }
+  .form-grid, .settings-layout, .advanced-search .form-grid, .result-filter-fields { grid-template-columns: minmax(0, 1fr); }
+  .field, .field input, .field select, .field textarea, .search-input, .toolbar, .preview-controls { min-width: 0; max-width: 100%; }
+  .nav-tabs, .table-wrap, .date-export-table { max-width: 100%; overscroll-behavior-x: contain; }
+  .table-wrap, .date-export-table { overflow-x: auto; }
+  .captcha-warning { width: 100%; overflow-y: auto; }
+  .captcha-warning-dialog { max-width: 100%; }
+}
+@media (max-width: 480px) {
+  .topbar, .monitor-timing, .preview-panel .preview-controls { flex-wrap: wrap; }
+  .date-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .captcha-warning { padding: 12px; }
+  .captcha-warning-dialog { padding: 20px 16px; }
+  .captcha-warning-dialog h2 { font-size: clamp(28px, 9vw, 42px); overflow-wrap: anywhere; }
+  .captcha-warning-actions .button { width: 100%; }
+}
+@media (max-width: 800px) {
+  html, body, .app-shell, .sidebar, .main-content { overflow-x: hidden; }
+  .sidebar { padding-left: max(15px, env(safe-area-inset-left)); padding-right: max(15px, env(safe-area-inset-right)); }
+  .main-content { padding-left: max(15px, env(safe-area-inset-left)); padding-right: max(15px, env(safe-area-inset-right)); padding-bottom: max(52px, env(safe-area-inset-bottom)); }
+  .nav-tabs { -webkit-overflow-scrolling: touch; touch-action: pan-x; }
+  .table-wrap, .date-export-table { -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
+  .captcha-warning { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+}

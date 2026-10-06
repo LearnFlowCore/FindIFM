@@ -73,3 +73,23 @@ h1, .cookie-dialog h2 { font-family: Georgia, "Times New Roman", serif; color: v
 main { width: 100%; max-width: 1184px; margin-inline: auto; }
 .screen.fit img { margin-inline: auto; }
 .cookie-dialog { margin-inline: auto; }
+.submit-feedback { position: sticky; bottom: 0; left: 0; width: 100%; min-height: 76px; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 18px; background: rgba(23,43,42,.94); color: #fff; font-weight: 700; text-align: center; }
+.submit-feedback[hidden] { display: none; }
+.submit-spinner { width: 22px; height: 22px; border: 3px solid #ffffff80; border-top-color: #fff; border-radius: 50%; animation: submit-spin .7s linear infinite; flex: none; }
+.screen.submitting img { opacity: .6; }
+.controls button:disabled { opacity: .7; cursor: progress; }
+@keyframes submit-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .submit-spinner { animation: none; border-color: #fff; } }
+@media (max-width: 600px) {
+  html, body, .top, main { width: 100%; max-width: 100%; overflow-x: hidden; }
+  main { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); padding-bottom: max(36px, env(safe-area-inset-bottom)); }
+  .top { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); padding-top: max(22px, env(safe-area-inset-top)); }
+  .screen { width: 100%; max-width: 100%; overscroll-behavior-x: contain; }
+  .screen.fit { overflow-x: hidden; }
+  .screen.fit img { display: none; width: 100%; max-width: 100%; }
+  .screen.fit.ready img { display: block; }
+  .screen:not(.fit) { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .controls .action-row input { min-width: 0; flex-basis: 100%; font-size: 16px; }
+  .controls .action-row button { min-width: 0; }
+  .submit-feedback { box-sizing: border-box; }
+}

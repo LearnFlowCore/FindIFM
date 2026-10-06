@@ -317,12 +317,62 @@
     warning.id = 'captchaWarning'; warning.className = 'captcha-warning'; warning.hidden = true;
     warning.innerHTML = '<div class="captcha-warning-dialog" role="alertdialog" aria-modal="true" aria-labelledby="captchaWarningTitle" aria-describedby="captchaWarningText"><span class="captcha-warning-icon" aria-hidden="true">!</span><span class="captcha-warning-kicker">ПОИСК ПРИОСТАНОВЛЕН</span><h2 id="captchaWarningTitle">ПРОЙТИ CAPTCHA</h2><p id="captchaWarningText">Яндекс ждёт подтверждения. На ответ есть 15 минут.</p><div class="captcha-warning-actions"><button type="button" class="button primary" id="captchaWarningOpen">↗ ПРОЙТИ CAPTCHA</button><button type="button" class="button secondary" id="captchaWarningDismiss">Позже</button></div><p id="captchaWarningHint" role="status"></p></div>';
     document.body.append(warning);
+    const mobileCaptcha = window.matchMedia('(max-width: 800px)');
+    function updateCaptchaWarning() {
+      $('#captchaWarningText').textContent = mobileCaptcha.matches
+        ? 'Яндекс ждёт подтверждения. Проверка откроется в отдельной вкладке. После ответа вернитесь к поиску. На ответ есть 15 минут.'
+        : 'Яндекс ждёт подтверждения. На ответ есть 15 минут.';
+      $('#captchaPanel p').textContent = mobileCaptcha.matches
+        ? 'Откройте проверку в отдельной вкладке. После ответа вернитесь сюда — поиск продолжится автоматически.'
+        : 'Нажмите кнопку и пройдите проверку в открывшемся окне. Поиск продолжится автоматически.';
+    }
+    updateCaptchaWarning();
+    if (mobileCaptcha.addEventListener) mobileCaptcha.addEventListener('change', updateCaptchaWarning);
+    else mobileCaptcha.addListener(updateCaptchaWarning);
+    function requestCaptchaNotifications() {
+      if (!('Notification' in window) || Notification.permission !== 'default') return;
+      // Permission may only be requested in response to a user's click.
+      Promise.resolve(Notification.requestPermission()).catch(() => {});
+    }
+    $('#searchForm').addEventListener('submit', requestCaptchaNotifications);
+    $('#quickTestButton').addEventListener('click', requestCaptchaNotifications);
+    document.addEventListener('click', event => {
+      if (event.target.closest('[data-rerun], [data-resume], [data-restart-job]')) requestCaptchaNotifications();
+    });
+    state.notifyCaptcha = job => {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return;
+      const notification = new Notification('Сигнал · Пройдите CAPTCHA', {
+        body: 'Яндекс ждёт подтверждения. Нажмите, чтобы открыть окно проверки (до 15 минут).',
+        tag: `signal-captcha-${job.id}`, requireInteraction: true,
+      });
+      notification.onclick = () => {
+        window.focus();
+        if (state.jobId === job.id) $('#captchaWarningOpen').click();
+        notification.close();
+      };
+      state.captchaNotification = notification;
+    };
     $('#captchaWarningDismiss').addEventListener('click', () => { warning.hidden = true; state.captchaWarningDismissed = state.jobId; });
     function openCaptchaWindow() {
       if (!state.captchaToken || !state.jobId) { $('#captchaHint').textContent = 'Доступ к проверке утрачен. Запустите новый поиск.'; return; }
       const url = `/captcha.html?job=${encodeURIComponent(state.jobId)}`;
-      const popup = window.open(url, 'signal-yandex-captcha', 'popup=yes,width=820,height=740,resizable=yes,scrollbars=yes');
-      if (!popup) { $('#captchaHint').textContent = 'Разрешите всплывающие окна для этого сайта и нажмите кнопку ещё раз.'; $('#captchaWarningHint').textContent = $('#captchaHint').textContent; return; }
+      if (mobileCaptcha.matches) {
+        // A script-opened tab inherits same-origin sessionStorage even if Safari
+        // does not expose window.opener for the postMessage handshake.
+        sessionStorage.setItem(`signal-captcha-${state.jobId}`, state.captchaToken);
+        if (appToken) sessionStorage.setItem(`signal-captcha-app-${state.jobId}`, appToken);
+      }
+      // Mobile browsers treat popups as tabs. Keep an opener for the access-token handshake.
+      const popup = mobileCaptcha.matches
+        ? window.open(url, '_blank')
+        : window.open(url, 'signal-yandex-captcha', 'popup=yes,width=820,height=740,resizable=yes,scrollbars=yes');
+      if (!popup) {
+        sessionStorage.removeItem(`signal-captcha-${state.jobId}`);
+        sessionStorage.removeItem(`signal-captcha-app-${state.jobId}`);
+        $('#captchaHint').textContent = 'Разрешите всплывающие окна для этого сайта и нажмите кнопку ещё раз.';
+        $('#captchaWarningHint').textContent = $('#captchaHint').textContent;
+        return;
+      }
       state.captchaWindow = popup;
       popup.focus();
       warning.hidden = true;
@@ -351,10 +401,17 @@
       $('#captchaWarningHint').textContent = '';
       warning.hidden = false;
       $('#captchaWarningOpen').focus();
+      state.notifyCaptcha(job);
     }
     if (waiting) document.title = '⚠ ПРОЙТИ CAPTCHA · Сигнал';
     if (!waiting) {
       warning.hidden = true;
+      state.captchaNotification?.close();
+      state.captchaNotification = null;
+      if (state.captchaWarningJob === job.id) {
+        sessionStorage.removeItem(`signal-captcha-${job.id}`);
+        sessionStorage.removeItem(`signal-captcha-app-${job.id}`);
+      }
       if (state.captchaWarningJob) { document.title = state.captchaPreviousTitle || document.title; state.captchaWarningJob = null; }
     } else if (state.captchaWarningDismissed !== job.id) warning.hidden = false;
   }

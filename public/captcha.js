@@ -5,10 +5,12 @@
   const validJob = /^[0-9a-f-]{36}$/i.test(jobId || '');
   const storageKey = `signal-captcha-${jobId}`;
   let token = validJob ? sessionStorage.getItem(storageKey) : null;
-  let appToken = '';
+  let appToken = validJob ? sessionStorage.getItem(`signal-captcha-app-${jobId}`) || '' : '';
   let waiting = true;
   let dragging = false;
   let loading = false;
+  let submitting = false;
+  let refreshTimers = [];
   let actions = Promise.resolve();
   let lastMove = 0;
   let cookieDismissed = false;
@@ -33,12 +35,44 @@
     $('loading').textContent = 'Не удалось показать изображение. Нажмите «Обновить изображение».';
   });
   function closeAfterSuccess() {
+    finishSubmitFeedback();
     setHint('Яндекс принял ответ. Поиск продолжается в основной вкладке; это окно сейчас закроется.');
     setTimeout(() => window.close(), 1200);
   }
 
   const setHint = message => { $('hint').textContent = message; };
   function setStatus(message, kind = '') { $('status').textContent = message; $('status').className = `status ${kind}`; }
+  function finishSubmitFeedback() {
+    submitting = false;
+    $('screen').classList.remove('submitting');
+    $('submitFeedback').hidden = true;
+    $('type').disabled = false;
+    $('enter').disabled = false;
+  }
+  async function submitAnswer(action, button) {
+    if (submitting || !waiting) return;
+    refreshTimers.forEach(clearTimeout);
+    refreshTimers = [];
+    submitting = true;
+    $('screen').classList.add('submitting');
+    $('submitFeedback').hidden = false;
+    $('submitMessage').textContent = 'Передаём ответ Яндексу…';
+    if (button) button.disabled = true;
+    setStatus('Отправляем ответ…');
+    try {
+      await action();
+      $('submitMessage').textContent = 'Проверяем ответ Яндекса…';
+      setStatus('Проверяем ответ…');
+      await new Promise(resolve => setTimeout(resolve, 450));
+      await refreshImage();
+      await checkJob();
+      if (waiting) {
+        setHint('Ответ отправлен. Если Яндекс показывает новое задание, продолжите проверку.');
+        refreshTimers = [1500, 3000].map(delay => setTimeout(refreshImage, delay));
+      }
+    } catch (error) { setHint(`Не удалось отправить ответ: ${error.message}`); }
+    finally { finishSubmitFeedback(); }
+  }
   async function request(path, options = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 25000);
@@ -81,7 +115,7 @@
     try {
       const screenshot = await captchaRequest();
       if (waiting && !dragging) {
-        img.src = screenshot.image; setStatus('Ожидаем вашего ответа');
+        img.src = screenshot.image; if (!submitting) setStatus('Ожидаем вашего ответа');
         if (!screenshot.cookieConsent) cookieDismissed = false;
         const showConsent = Boolean(screenshot.cookieConsent) && !cookieDismissed;
         const overlay = $('cookieOverlay');
@@ -98,18 +132,26 @@
       const job = await request(`/api/jobs/${encodeURIComponent(jobId)}`);
       if (!waiting) return;
       if (job.status === 'waiting_captcha') {
-        setStatus('Ожидаем вашего ответа');
+        if (!submitting) setStatus('Ожидаем вашего ответа');
       } else if (['completed', 'cancelled', 'failed'].includes(job.status)) {
         waiting = false;
+        refreshTimers.forEach(clearTimeout);
+        refreshTimers = [];
+        finishSubmitFeedback();
         $('cookieOverlay').hidden = true;
         sessionStorage.removeItem(storageKey);
+        sessionStorage.removeItem(`signal-captcha-app-${jobId}`);
         setStatus(job.status === 'completed' ? 'Поиск завершён' : job.status === 'cancelled' ? 'Поиск остановлен' : 'Ошибка поиска', job.status === 'failed' ? 'error' : 'done');
         if (job.status === 'completed') closeAfterSuccess();
         else setHint(job.error || job.message || 'Откройте основную вкладку, чтобы посмотреть результат.');
       } else if (job.status === 'running') {
         waiting = false;
+        refreshTimers.forEach(clearTimeout);
+        refreshTimers = [];
+        finishSubmitFeedback();
         $('cookieOverlay').hidden = true;
         sessionStorage.removeItem(storageKey);
+        sessionStorage.removeItem(`signal-captcha-app-${jobId}`);
         setStatus('Проверка пройдена ✓', 'done');
         closeAfterSuccess();
       }
@@ -130,7 +172,7 @@
   if (!token) setHint('Получаем доступ к проверке от основной вкладки...');
 
   img.addEventListener('pointerdown', event => {
-    if (!waiting || !token || !img.naturalWidth) return;
+    if (!waiting || submitting || !token || !img.naturalWidth) return;
     event.preventDefault();
     img.setPointerCapture(event.pointerId);
     dragging = true;
@@ -146,7 +188,7 @@
   function finishDrag(event) {
     if (!dragging) return;
     dragging = false;
-    send({ type: 'up', ...coords(event) }).then(() => setTimeout(refreshImage, 250)).catch(() => {});
+    submitAnswer(() => send({ type: 'up', ...coords(event) }));
   }
   img.addEventListener('pointerup', finishDrag);
   img.addEventListener('pointercancel', finishDrag);
@@ -159,15 +201,12 @@
   $('type').addEventListener('click', async () => {
     const input = $('answer');
     if (!input.value.trim()) { input.focus(); return; }
-    $('type').disabled = true;
-    try {
+    if (submitting) return;
+    await submitAnswer(async () => {
       await send({ type: 'text', value: input.value.trim() });
       await send({ type: 'key', value: 'Enter' });
       input.value = '';
-      setHint('Текст отправлен. Ожидаем ответ Яндекса…');
-      setTimeout(refreshImage, 250);
-    } catch { /* Сообщение об ошибке показывает send. */ }
-    finally { $('type').disabled = false; }
+    }, $('type'));
   });
   $('answer').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); $('type').click(); } });
   for (const [id, key] of [['enter', 'Enter'], ['tab', 'Tab'], ['backspace', 'Backspace']]) {
@@ -176,7 +215,8 @@
         setHint('Для текстового ответа нажмите «Отправить текст».');
         return;
       }
-      send({ type: 'key', value: key }).then(() => { if (id === 'enter') { setHint('Выбор подтверждён. Ожидаем результат Яндекса…'); setTimeout(refreshImage, 250); } }).catch(() => {});
+      if (id === 'enter') submitAnswer(() => send({ type: 'key', value: key }), $(id));
+      else send({ type: 'key', value: key }).catch(() => {});
     });
   }
   for (const [id, delta] of [['scrollUp', -500], ['scrollDown', 500]]) {
