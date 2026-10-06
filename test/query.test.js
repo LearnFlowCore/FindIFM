@@ -47,3 +47,8 @@ test('поддерживает настраиваемую точность со�
 test('проверяет диапазон длины текста', () => {
   assert.throws(() => parseQuery({ query: 'тест', minTextLength: 100, maxTextLength: 10 }), /Минимальная длина/);
 });
+
+test('сохраняет фильтр тональности в критериях поиска', () => {
+  assert.equal(parseQuery({ query: 'тест', sentiment: 'negative' }).sentiment, 'negative');
+  assert.equal(parseQuery({ query: 'тест', sentiment: 'unknown' }).sentiment, 'any');
+});

@@ -31,6 +31,7 @@ function parseQuery(input = {}) {
   return {
     original, text: searchText, normalized, exactPhrase, matchMode,
     semantic: input.semantic === true,
+    sentiment: ['positive', 'neutral', 'negative'].includes(input.sentiment) ? input.sentiment : 'any',
     words: [...new Set(normalized.split(' ').filter(Boolean))],
     acronyms: [...new Set(acronyms)],
     extractedDate: extracted.date, period: input.period || null, ...range,

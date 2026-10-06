@@ -3,6 +3,7 @@ const { normalizeUrl } = require('../utils/url');
 const { domainAllowed } = require('../utils/domain');
 const { parseDate } = require('../utils/date');
 const { buildYandexText, textMatches } = require('../utils/query');
+const { classifySentiment } = require('../utils/sentiment');
 
 class SearchProvider { async search() { throw new Error('SearchProvider.search должен быть реализован'); } }
 class YandexAPIProvider extends SearchProvider { async search() { throw new Error('Yandex Search API пока не настроен'); } }
@@ -18,6 +19,7 @@ function passesContentFilters(page, query) {
   if (query.maxTextLength && length > query.maxTextLength) return false;
   if (query.media === 'present' && !page.hasMedia) return false;
   if (query.media === 'absent' && page.hasMedia) return false;
+  if (query.sentiment !== 'any' && (page.sentiment || classifySentiment(`${page.title || ''} ${page.text || ''} ${page.description || ''}`)) !== query.sentiment) return false;
   return true;
 }
 
@@ -52,7 +54,8 @@ class YandexHTMLProvider extends SearchProvider {
         visited.add(url); inspected += 1;
         const snippetMatch = entry.depth === 0 && textMatches(`${item.title} ${item.snippet}`, query);
         try {
-          const page = await this.browser.inspect(url, query, settings);
+           const page = await this.browser.inspect(url, query, settings);
+           page.sentiment = classifySentiment(`${page.title || ''} ${page.text || ''} ${page.description || ''}`);
           let matched = false;
           if ((query.semantic || textMatches(`${page.title} ${page.text}`, query)) && passesContentFilters(page, query)) {
             const date = parseDate(page.dateText) || (entry.depth === 0 ? parseDate(item.dateText) : null) || parseDate(url);
@@ -77,7 +80,7 @@ class YandexHTMLProvider extends SearchProvider {
         } catch (error) {
           hooks.onSiteError?.(url, error.message);
           this.log.warn({ url, error: error.message }, 'Не удалось загрузить найденную страницу');
-          if (entry.depth !== 0 || (!query.semantic && !snippetMatch) || query.category || query.minTextLength || query.maxTextLength || query.media !== 'any' || query.includeKeywords?.length || query.excludeKeywords?.length) continue;
+           if (entry.depth !== 0 || (!query.semantic && !snippetMatch) || query.category || query.minTextLength || query.maxTextLength || query.media !== 'any' || query.sentiment !== 'any' || query.includeKeywords?.length || query.excludeKeywords?.length) continue;
           const date = parseDate(item.dateText);
           if ((query.extractedDate && !date) || !inRange(date, query) || candidateUrls.has(url)) continue;
           candidateUrls.add(url);

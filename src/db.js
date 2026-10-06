@@ -35,7 +35,7 @@ function openDatabase(file) {
       domain TEXT, title TEXT, date TEXT, description TEXT, query TEXT,
       search_date TEXT, search_run_date TEXT, status TEXT, snippet_match INTEGER DEFAULT 0,
       category TEXT, text_length INTEGER DEFAULT 0, has_media INTEGER DEFAULT 0,
-      evidence TEXT, semantic_score REAL
+       evidence TEXT, semantic_score REAL, sentiment TEXT
     );
     CREATE INDEX IF NOT EXISTS results_job ON results(job_id);
     CREATE INDEX IF NOT EXISTS results_url ON results(url_normalized);
@@ -58,7 +58,7 @@ function openDatabase(file) {
   addMissingColumns(db, 'results', {
     url_normalized: 'TEXT', description: 'TEXT', query: 'TEXT', search_date: 'TEXT',
     search_run_date: 'TEXT', snippet_match: 'INTEGER DEFAULT 0', category: 'TEXT',
-    text_length: 'INTEGER DEFAULT 0', has_media: 'INTEGER DEFAULT 0', evidence: 'TEXT', semantic_score: 'REAL',
+     text_length: 'INTEGER DEFAULT 0', has_media: 'INTEGER DEFAULT 0', evidence: 'TEXT', semantic_score: 'REAL', sentiment: 'TEXT',
   });
   addMissingColumns(db, 'search_history', {
     query: 'TEXT', extracted_date: 'TEXT', period: 'TEXT', date_from: 'TEXT', date_to: 'TEXT',

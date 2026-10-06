@@ -174,8 +174,9 @@ async function startServer(options = {}) {
     domain: req.query.domain, dateFrom: req.query.dateFrom, dateTo: req.query.dateTo, category: req.query.category,
     minTextLength: req.query.minTextLength, maxTextLength: req.query.maxTextLength,
     hasMedia: req.query.hasMedia === 'present' ? true : req.query.hasMedia === 'absent' ? false : undefined,
-    includeKeywords: req.query.includeKeywords, excludeKeywords: req.query.excludeKeywords,
-    includeUnknownDate: req.query.includeUnknownDate !== 'false' && req.query.undefinedDate !== 'false',
+     includeKeywords: req.query.includeKeywords, excludeKeywords: req.query.excludeKeywords,
+     sentiment: req.query.sentiment,
+     includeUnknownDate: req.query.includeUnknownDate !== 'false' && req.query.undefinedDate !== 'false',
   })));
   app.get('/api/results/dynamics', (req, res) => {
     const { jobId, from, to } = req.query;

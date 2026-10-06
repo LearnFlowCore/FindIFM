@@ -38,9 +38,9 @@ class Repository {
   hasUrl(url) { return Boolean(this.db.prepare('SELECT 1 FROM results WHERE url_normalized=? LIMIT 1').get(url)); }
   addResults(jobId, rows) {
     const statement = this.db.prepare(`INSERT INTO results
-      (job_id,url,url_normalized,domain,title,date,description,query,search_date,search_run_date,status,snippet_match,category,text_length,has_media,evidence,semantic_score)
-      VALUES (@jobId,@url,@urlNormalized,@domain,@title,@date,@description,@query,@searchDate,@searchRunDate,@status,@snippetMatch,@category,@textLength,@hasMedia,@evidence,@semanticScore)`);
-    this.db.transaction(items => items.forEach(item => statement.run({ jobId, ...item, category: item.category || '', textLength: Number(item.textLength || 0), hasMedia: Number(item.hasMedia || 0), evidence: item.evidence || '', semanticScore: item.semanticScore ?? null })))(rows);
+       (job_id,url,url_normalized,domain,title,date,description,query,search_date,search_run_date,status,snippet_match,category,text_length,has_media,evidence,semantic_score,sentiment)
+       VALUES (@jobId,@url,@urlNormalized,@domain,@title,@date,@description,@query,@searchDate,@searchRunDate,@status,@snippetMatch,@category,@textLength,@hasMedia,@evidence,@semanticScore,@sentiment)`);
+     this.db.transaction(items => items.forEach(item => statement.run({ jobId, ...item, category: item.category || '', textLength: Number(item.textLength || 0), hasMedia: Number(item.hasMedia || 0), evidence: item.evidence || '', semanticScore: item.semanticScore ?? null, sentiment: item.sentiment || 'neutral' })))(rows);
   }
   results(options = {}) {
     const page = Math.max(1, Number(options.page) || 1);
@@ -64,6 +64,7 @@ class Repository {
     if (options.maxTextLength) { where.push('text_length<=?'); args.push(Number(options.maxTextLength)); }
     if (options.hasMedia === true) where.push('has_media=1');
     if (options.hasMedia === false) where.push('has_media=0');
+    if (['positive', 'neutral', 'negative'].includes(options.sentiment)) { where.push('sentiment=?'); args.push(options.sentiment); }
     for (const word of String(options.includeKeywords || '').split(',').map(x => x.trim()).filter(Boolean)) { where.push('(title LIKE ? OR description LIKE ?)'); args.push(`%${word}%`, `%${word}%`); }
     for (const word of String(options.excludeKeywords || '').split(',').map(x => x.trim()).filter(Boolean)) { where.push('(title NOT LIKE ? AND description NOT LIKE ?)'); args.push(`%${word}%`, `%${word}%`); }
     if (options.q) { where.push('(title LIKE ? OR url LIKE ? OR domain LIKE ? OR description LIKE ? OR query LIKE ?)'); args.push(...Array(5).fill(`%${options.q}%`)); }
