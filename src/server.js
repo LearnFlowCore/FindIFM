@@ -164,6 +164,10 @@ async function startServer(options = {}) {
     const jobId = jobs.start(query);
     return res.status(202).json({ jobId, captchaToken: jobs.captchaToken(jobId) });
   }));
+  app.post('/api/jobs/:id/resume', asyncRoute(async (req, res) => {
+    if (!await jobs.resume(req.params.id)) return res.status(409).json({ error: 'Это задание нельзя продолжить.' });
+    return res.status(202).json({ jobId: req.params.id, captchaToken: jobs.captchaToken(req.params.id) });
+  }));
   app.get('/api/results', (req, res) => res.json(repo.results({
     jobId: req.query.jobId, page: req.query.page, limit: req.query.limit || req.query.pageSize,
     sort: req.query.sort, order: req.query.order, q: req.query.q, status: req.query.status,

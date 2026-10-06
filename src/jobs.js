@@ -56,6 +56,7 @@ class JobManager {
           this.repo.updateTask(id, 'running', job.progress, job.message);
           this.repo.addTaskLog(id, 'info', 'captcha_solved', job.message);
         },
+        onSearchPage: page => { query.resumePage = page; this.repo.updateQuery(id, query); },
         onCheckpoint: (page, count) => {
           const progress = Math.min(80, 5 + Math.round((page / Math.max(1, settings.maxPages)) * 70));
           job.status = 'running'; job.progress = progress; job.searchPages = page; job.searchCards = count; job.message = `Обработано страниц: ${page}, карточек: ${count}`;
@@ -129,7 +130,13 @@ class JobManager {
          : /timeout|тайм-аут|timed out/i.test(reason) ? `Таймаут: ${reason}`
          : /распознать|селектор|карточки|parse/i.test(reason) ? `Не удалось распарсить страницу: ${reason}`
          : /лимит|limit/i.test(reason) ? `Превышен лимит: ${reason}` : reason;
-       Object.assign(job, { status: cancelled ? 'cancelled' : 'failed', error: cancelled ? null : readable, progress: 100 });
+        if (!cancelled && error.code === 'CAPTCHA_TIMEOUT') {
+          Object.assign(job, { status: 'paused_captcha', error: readable, message: 'Ожидание CAPTCHA истекло. Поиск можно продолжить с этой страницы.', captcha: false });
+          this.repo.updateTask(id, 'paused_captcha', job.progress, job.message);
+          this.repo.addTaskLog(id, 'warn', 'captcha_paused', job.message, { resumePage: query.resumePage || 0 });
+          return;
+        }
+        Object.assign(job, { status: cancelled ? 'cancelled' : 'failed', error: cancelled ? null : readable, progress: 100 });
       this.repo.finishHistory(id, job.status, job.resultsCount, job.duplicatesCount, job.error);
        job.message = cancelled ? 'Поиск остановлен' : readable;
        this.repo.addTaskLog(id, cancelled ? 'info' : 'error', job.status, cancelled ? 'Задача остановлена' : job.error);
@@ -156,6 +163,18 @@ class JobManager {
     this.repo.addTaskLog(id, 'warn', 'stopping', 'Запрошена остановка задачи');
     if (this.running && job.progress > 0) await this.provider.browser.close();
     if (job.progress === 0) { job.status = 'cancelled'; job.progress = 100; this.repo.finishHistory(id, 'cancelled'); }
+    return true;
+  }
+  async resume(id) {
+    const job = this.jobs.get(id);
+    if (!job || job.status !== 'paused_captcha') return false;
+    if (this.isBusy()) throw new Error('Дождитесь завершения другого поиска.');
+    const query = JSON.parse(JSON.stringify(job.query));
+    job.cancelled = false; job.status = 'queued'; job.error = null; job.message = 'Поиск поставлен в очередь для продолжения';
+    this.repo.updateTask(id, 'queued', job.progress, job.message);
+    this.repo.addTaskLog(id, 'info', 'resumed', `Продолжение с страницы ${Number(query.resumePage || 0) + 1}`);
+    this.captchaTokens.set(id, crypto.randomBytes(32).toString('hex'));
+    this.queue = this.queue.then(() => this.run(id, query));
     return true;
   }
   isBusy() { return this.running || [...this.jobs.values()].some(job => job.status === 'queued'); }

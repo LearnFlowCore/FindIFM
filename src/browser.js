@@ -19,7 +19,7 @@ function applySearchParams(url, query, pageNumber) {
   return target.toString();
 }
 
-class CaptchaError extends Error { constructor(message = 'Яндекс запросил капчу') { super(message); this.name = 'CaptchaError'; } }
+class CaptchaError extends Error { constructor(message = 'Яндекс запросил капчу', code = 'CAPTCHA') { super(message); this.name = 'CaptchaError'; this.code = code; } }
 
 // Выполняется в контексте страницы Яндекса (включая её фреймы).
 function cookieConsentButton(accept = false) {
@@ -103,7 +103,7 @@ class YandexBrowser {
     try {
       while (page && !page.isClosed()) {
         if (hooks.isCancelled?.()) throw new Error('Поиск остановлен пользователем');
-        if (Date.now() >= expiresAt) throw new CaptchaError('Время ручного подтверждения CAPTCHA истекло (15 минут).');
+        if (Date.now() >= expiresAt) throw new CaptchaError('Время ручного подтверждения CAPTCHA истекло (15 минут).', 'CAPTCHA_TIMEOUT');
         await sleep(2000);
         if (!(await this.isCaptcha(page))) { hooks.onCaptchaSolved?.(); return true; }
       }
@@ -175,9 +175,11 @@ class YandexBrowser {
     const collected = [];
     const deadline = Date.now() + Math.max(1, Number(settings.maxDurationMinutes) || 30) * 60000;
     try {
-      for (let number = 0; number < settings.maxPages; number += 1) {
+      const firstPage = Math.max(0, Number(query.resumePage) || 0);
+      for (let number = firstPage; number < settings.maxPages; number += 1) {
         if (hooks.isCancelled?.()) break;
         if (Date.now() >= deadline) { this.log.warn?.({ page: number }, 'Достигнут лимит времени поисковой задачи'); break; }
+        hooks.onSearchPage?.(number);
         const url = this.searchUrl(query, number);
         const response = await this.navigate(page, url);
         if (response?.status() === 429) throw new CaptchaError('Яндекс вернул HTTP 429');

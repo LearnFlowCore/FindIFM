@@ -131,3 +131,84 @@
 .report-overlay { justify-content: center; }
 .report-dialog { width: min(100%, 720px); min-width: 0; }
 .modal, .report-dialog, .dynamics-dialog, .semantic-dialog, .captcha-warning-dialog { margin-inline: auto; }
+
+/* Аналитический кабинет: плотная сетка и контраст Brand Analytics. */
+:root {
+  --ink: #202637;
+  --muted: #7b8497;
+  --line: #e4e8f0;
+  --paper: #ffffff;
+  --bg: #f5f7fb;
+  --navy: #202b52;
+  --blue: #5367e8;
+  --teal: #22b7a0;
+  --red: #e15d68;
+  --shadow: 0 8px 24px rgba(34, 48, 86, .06);
+}
+
+body { background: var(--bg); color: var(--ink); font-family: Inter, "Segoe UI", Arial, sans-serif; }
+.app-shell { background: var(--bg); }
+.sidebar { width: 224px; padding: 24px 14px 18px; background: var(--navy); }
+.brand { padding: 0 10px 42px; }
+.brand-mark { width: 32px; height: 32px; border-radius: 9px; background: #8b9aff; color: #fff; box-shadow: none; }
+.brand small { color: #9aa7d2; }
+.nav-tabs { gap: 4px; }
+.nav-tab { padding: 11px 12px; border-radius: 8px; color: #aab5d2; }
+.nav-tab:hover { background: rgba(255,255,255,.08); color: #fff; }
+.nav-tab.active { background: #344274; color: #fff; box-shadow: inset 3px 0 #7d8cff; }
+.nav-count { background: #4a5a8c; color: #e8ecff; }
+.sidebar-bottom { border-top-color: rgba(255,255,255,.12); color: #9ca8c4; }
+.main-content { padding: 26px clamp(18px, 3vw, 48px) 64px; }
+.topbar { margin-bottom: 38px; }
+.eyebrow, .workflow-kicker { color: var(--blue); }
+.topbar h1, .section-intro h2 { font-family: Inter, "Segoe UI", Arial, sans-serif; color: #202b52; letter-spacing: -.5px; }
+.topbar h1 { font-size: 28px; font-weight: 750; }
+.section-intro h2 { font-size: 24px; font-weight: 750; }
+.section-intro p { color: var(--muted); }
+.card { border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.search-card { padding: 28px 30px; }
+.workflow-step { margin-top: 22px; }
+.step-number { background: #e9edff; color: var(--blue); box-shadow: none; }
+.field > span { color: #4f5870; }
+.field input, .field select, .field textarea { background: #fff; border-color: #dfe4ed; border-radius: 7px; }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(83,103,232,.12); }
+.button { border-radius: 7px; }
+.button.primary { background: var(--blue); box-shadow: 0 7px 16px rgba(83,103,232,.2); }
+.button.primary:hover { background: #4155d2; }
+.button.secondary { background: #fff; color: #4d5a78; border-color: var(--line); }
+.button.secondary:hover { border-color: #aeb8ef; color: var(--blue); }
+.launch-button { min-width: 240px; }
+.toolbar { background: #fff; padding: 13px 15px; }
+.result-filter-fields { background: #fff; border-color: var(--line); }
+.result-save-panel { background: #202b52; color: #f5f7ff; }
+.table-card { overflow: hidden; }
+th { background: #f8f9fc; color: #7b8497; }
+td { color: #515b70; }
+tbody tr:hover { background: #f6f8ff; }
+.result-title { color: #4e63d8; }
+.result-title:hover { color: #3549bd; }
+.pill.success { background: #ddf5ef; color: #168a78; }
+.pill.pending { background: #fff1d7; color: #a36a16; }
+.pill.failed { background: #ffe5e8; color: #b44755; }
+.keyword-monitor, .analytics-panel, .reputation-panel, .live-mentions { border-color: var(--line); }
+.keyword-monitor { background: #fff; }
+.monitor-track { background: #e7ebf8; }
+.monitor-track span { background: linear-gradient(90deg, #5367e8, #22b7a0); }
+.analytics-panel { background: #fff; }
+.analytics-metric { background: #f5f7ff; }
+.analytics-metric.active { background: #eef0ff; }
+.analytics-metric.measured { background: #e5f8f3; }
+.analytics-track { background: #dfe5f5; }
+.analytics-track div { background: var(--blue); }
+.analytics-chart { background: linear-gradient(120deg, #f5f6ff, #fff 55%, #effaf7); }
+.settings-save-results { background: linear-gradient(125deg, #202b52, #344274); }
+.save-results-kicker { color: #aeb8ff; }
+.danger-zone { background: #fff7f8; border-color: #f1dce1; }
+.modal { border-radius: 12px; }
+
+@media (max-width: 800px) {
+  .sidebar { width: 100%; padding: 16px 15px 10px; }
+  .brand { padding-bottom: 20px; }
+  .main-content { padding: 22px 15px 52px; }
+  .topbar { margin-bottom: 30px; }
+}

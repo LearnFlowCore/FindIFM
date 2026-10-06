@@ -5,9 +5,9 @@ const { JobManager } = require('../src/jobs');
 function repository() {
   const entries = [];
   return {
-    entries, addHistory() {}, addTaskLog() {}, updateTask() {},
+    entries, addHistory() {}, addTaskLog() {}, updateTask() {}, updateQuery() {},
     settings: () => ({ maxPages: 5, maxResults: 500, maxDurationMinutes: 30 }),
-    addResults: (_id, rows) => entries.push(...rows),
+    addResults: (_id, rows) => entries.push(...rows), hasUrl: () => false,
     finishHistory() {},
   };
 }
@@ -42,4 +42,33 @@ test('остановка отменяет сохранение результа�
   await jobs.waitForIdle();
   assert.equal(jobs.get(id).status, 'cancelled');
   assert.equal(repo.entries.length, 0);
+});
+
+test('истёкшая CAPTCHA ставит задачу на паузу и продолжает её с сохранённой страницы', async () => {
+  const repo = repository();
+  let attempts = 0;
+  let resumePage;
+  const provider = {
+    browser: { close: async () => {} },
+    search: async (_query, _settings, hooks) => {
+      attempts += 1;
+      if (attempts === 1) {
+        hooks.onSearchPage(3);
+        const error = new Error('Время ручного подтверждения CAPTCHA истекло');
+        error.code = 'CAPTCHA_TIMEOUT';
+        throw error;
+      }
+      resumePage = _query.resumePage;
+      return { candidates: [], withinDuplicates: 0 };
+    },
+  };
+  const jobs = new JobManager(repo, provider, { error() {} }, () => {}, async () => ({ ok: true }));
+  const id = jobs.start({ query: 'пример' });
+  await jobs.waitForIdle();
+  assert.equal(jobs.get(id).status, 'paused_captcha');
+  assert.equal(jobs.get(id).query.resumePage, 3);
+  assert.equal(await jobs.resume(id), true);
+  await jobs.waitForIdle();
+  assert.equal(resumePage, 3);
+  assert.equal(jobs.get(id).status, 'completed');
 });

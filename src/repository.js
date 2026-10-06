@@ -20,6 +20,9 @@ class Repository {
       .run(jobId, query.original, JSON.stringify(query), query.extractedDate, query.period, query.from, query.to,
         JSON.stringify(query.whitelist), JSON.stringify(query.blacklist));
   }
+  updateQuery(jobId, query) {
+    this.db.prepare("UPDATE search_history SET query_json=?,updated_at=datetime('now','localtime') WHERE job_id=?").run(JSON.stringify(query), jobId);
+  }
   finishHistory(jobId, status, resultsCount = 0, duplicatesCount = 0, error = null) {
     this.db.prepare("UPDATE search_history SET status=?,results_count=?,duplicates_count=?,error=?,progress=100,finished_at=datetime('now','localtime'),updated_at=datetime('now','localtime') WHERE job_id=?")
       .run(status, resultsCount, duplicatesCount, error, jobId);
