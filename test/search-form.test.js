@@ -33,7 +33,7 @@ test('форма отправляет название и точную дату 
     await page.goto(`${service.url}/#token=test-token`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('#quickTestButton');
     assert.equal(await page.$eval('.search-options', element => element.open), false);
-    assert.equal(await page.$eval('#searchForm [name="deepPages"]', element => element.value), '4');
+    assert.equal(await page.$eval('#searchForm [name="deepPages"]', element => element.value), '12');
     await page.$eval('#searchForm [name="query"]', element => { element.value = 'Министерство'; });
     await page.$eval('#searchForm [name="date"]', element => {
       element.value = '2026-10-07';

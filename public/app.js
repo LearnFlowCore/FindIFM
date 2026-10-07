@@ -441,9 +441,9 @@
   $('#saveResultsTxt').addEventListener('click', saveResultsTxt);
   setupAdvancedSearch(); setupSentimentSearch(); setupQuickTest(); setupSettingsExtensions(); setupAdmin(); setupSavedArchive(); setupResultFilters(); setupResultsTable(); setupDateExport(); setupKeywordMonitor(); setupCaptcha(); setupPreview(); setupDocumentTitle(); setupQuietLayout();
   const deepPagesField = $('#searchForm [name="deepPages"]');
-  deepPagesField.max = '12'; deepPagesField.value = '4';
+  deepPagesField.max = '12'; deepPagesField.value = '12';
   deepPagesField.previousElementSibling.textContent = 'Внутренних страниц на сайт (0–12)';
-  deepPagesField.nextElementSibling.textContent = 'По умолчанию до 4; общий лимит задаётся настройкой maxDeepPages (максимум 12).';
+  deepPagesField.nextElementSibling.textContent = 'Сначала до 4 страниц; если совпадений нет, следующая партия. Максимум 12, общий лимит — maxDeepPages.';
   const searchForm = $('#searchForm');
   searchForm.date.addEventListener('change', () => {
     if (!searchForm.date.value) return;

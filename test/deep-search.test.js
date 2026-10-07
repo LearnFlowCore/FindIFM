@@ -35,10 +35,10 @@ test('ранжирует URL внутренних страниц и соблюд
   const visited = [];
   const browser = {
     collect: async () => [{ url: 'https://example.org/', title: 'Главная', snippet: 'Каталог' }],
-    inspect: async url => { visited.push(url); return { title: 'Страница', text: url.includes('romashka') ? 'romashka упоминание' : 'Нет совпадения', links: url === 'https://example.org' ? links : [] }; },
+    inspect: async url => { visited.push(url); return { title: 'Страница', text: 'Нет совпадения', links: url === 'https://example.org' ? links : [] }; },
   };
   const provider = new YandexHTMLProvider(browser, { warn() {} });
-  for (const [setting, expected] of [[undefined, 4], [8, 8], [20, 12]]) {
+  for (const [setting, expected] of [[4, 4], [8, 8], [20, 12]]) {
     visited.length = 0;
     let stats;
     const result = await provider.search(parseQuery({ query: 'romashka', deepPages: 12 }),
@@ -46,13 +46,72 @@ test('ранжирует URL внутренних страниц и соблюд
       { onSearchStats: value => { stats = value; } });
     assert.equal(visited.length, expected + 1);
     assert.equal(visited[1], 'https://example.org/romashka-story');
-    assert.equal(result.candidates.length, 1);
+    assert.equal(result.candidates.length, 0);
     assert.equal(stats.deepLinksFound, 15);
     assert.equal(stats.deepLinksSelected, expected);
     assert.equal(stats.deepPagesInspected, expected);
-    assert.equal(stats.deepAccepted, 1);
+    assert.equal(stats.deepAccepted, 0);
     assert.equal(stats.rootInspected, 1);
   }
+});
+
+test('адаптивный обход останавливается после успешной первой партии из четырёх ссылок', async () => {
+  const links = Array.from({ length: 12 }, (_, i) => `https://example.org/section-${i + 1}`);
+  const visited = [];
+  let stats;
+  const browser = {
+    collect: async () => [{ url: 'https://example.org/', title: 'Каталог', snippet: '' }],
+    inspect: async url => {
+      visited.push(url);
+      return { title: 'Страница', text: url.endsWith('/section-3') ? 'Ромашка' : 'Нет совпадения', links: url === 'https://example.org' ? links : [] };
+    },
+  };
+  const result = await new YandexHTMLProvider(browser, { warn() {} }).search(
+    parseQuery({ query: 'Ромашка', deepPages: 12 }), { maxDeepPages: 12, maxResults: 20, maxDurationMinutes: 1 },
+    { onSearchStats: value => { stats = value; } });
+  assert.deepEqual(visited, ['https://example.org', ...links.slice(0, 4)]);
+  assert.deepEqual(result.candidates.map(row => row.url), [links[2]]);
+  assert.equal(stats.deepLinksFound, 12);
+  assert.equal(stats.deepLinksSelected, 4);
+  assert.equal(stats.deepPagesInspected, 4);
+  assert.equal(stats.deepAccepted, 1);
+});
+
+test('без совпадений в первых двух партиях доходит до девятой ссылки', async () => {
+  const links = Array.from({ length: 12 }, (_, i) => `https://example.org/section-${i + 1}`);
+  const visited = [];
+  const browser = {
+    collect: async () => [{ url: 'https://example.org/', title: 'Каталог', snippet: '' }],
+    inspect: async url => {
+      visited.push(url);
+      return { title: 'Страница', text: url.endsWith('/section-9') ? 'Ромашка' : 'Нет совпадения', links: url === 'https://example.org' ? links : [] };
+    },
+  };
+  const result = await new YandexHTMLProvider(browser, { warn() {} }).search(
+    parseQuery({ query: 'Ромашка', deepPages: 12 }), { maxDeepPages: 12, maxResults: 20, maxDurationMinutes: 1 });
+  assert.equal(visited.length, 13);
+  assert(visited.includes(links[8]));
+  assert.deepEqual(result.candidates.map(row => row.url), [links[8]]);
+});
+
+test('три ссылки, дубликаты, другой хост и файлы не увеличивают число inspect', async () => {
+  const links = ['https://example.org/one', 'https://example.org/two', 'https://example.org/three'];
+  const visited = [];
+  let stats;
+  const browser = {
+    collect: async () => [{ url: 'https://example.org/', title: 'Каталог', snippet: '' }],
+    inspect: async url => {
+      visited.push(url);
+      return { title: 'Страница', text: 'Нет совпадения', links: url === 'https://example.org'
+        ? [...links, links[0], `${links[0]}#chapter`, 'https://elsewhere.org/four', 'https://example.org/file.pdf', 'https://example.org/image.png', 'https://example.org/archive.zip'] : [] };
+    },
+  };
+  await new YandexHTMLProvider(browser, { warn() {} }).search(
+    parseQuery({ query: 'Ромашка', deepPages: 12 }), { maxDeepPages: 12, maxResults: 20, maxDurationMinutes: 1 },
+    { onSearchStats: value => { stats = value; } });
+  assert.deepEqual(visited, ['https://example.org', ...links]);
+  assert.equal(stats.deepPagesInspected, 3);
+  assert.equal(stats.deepLinksSelected, 3);
 });
 
 test('находит упоминание на внутренней странице, когда главная страница не совпадает', async () => {

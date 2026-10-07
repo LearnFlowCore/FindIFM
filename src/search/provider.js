@@ -9,6 +9,8 @@ class SearchProvider { async search() { throw new Error('SearchProvider.search �
 class YandexAPIProvider extends SearchProvider { async search() { throw new Error('Yandex Search API пока не настроен'); } }
 
 function inRange(date, query) { return !date || ((!query.from || date >= query.from) && (!query.to || date <= query.to)); }
+const INITIAL_DEEP_PAGES = 4;
+const MAX_DEEP_PAGES = 12;
 function scoreDeepLink(url, query) {
   // Browser.inspect currently provides URL strings, not anchor text or titles.
   let source;
@@ -50,8 +52,8 @@ class YandexHTMLProvider extends SearchProvider {
     const candidates = [], seen = new Set(), candidateUrls = new Set(), visited = new Set(); let withinDuplicates = 0, skipped = 0;
     const deep = { rootInspected: 0, deepLinksFound: 0, deepLinksSelected: 0, deepPagesInspected: 0, deepAccepted: 0 };
     const maxResults = Number(settings.maxResults) || 500;
-    const maxDeepPages = Number(settings.maxDeepPages ?? 4);
-    const maxSitePages = Math.min(query.deepPages ?? 12, Number.isFinite(maxDeepPages) ? Math.max(0, Math.floor(maxDeepPages)) : 4, 12);
+    const maxDeepPages = Number(settings.maxDeepPages ?? MAX_DEEP_PAGES);
+    const maxSitePages = Math.min(query.deepPages ?? MAX_DEEP_PAGES, Number.isFinite(maxDeepPages) ? Math.max(0, Math.floor(maxDeepPages)) : MAX_DEEP_PAGES, MAX_DEEP_PAGES);
     const maxInspections = Math.min(300, Math.max(30, raw.length * (maxSitePages + 1)));
     let inspected = 0;
     for (const item of raw) {
@@ -64,15 +66,27 @@ class YandexHTMLProvider extends SearchProvider {
       if (!domainAllowed(normalized, query.whitelist, query.blacklist)) { skipped += 1; continue; }
       const hostname = new URL(normalized).hostname;
       const pending = [{ url: item.url, depth: 0 }];
-      let sitePages = 0;
-      while (pending.length && candidates.length < maxResults && inspected < maxInspections && Date.now() < inspectionDeadline) {
+      const available = [];
+      let deepPagesInspectedForSite = 0, siteDeepAccepted = 0, linkOrder = 0;
+      const queueNextBatch = () => {
+        const capacity = Math.min(INITIAL_DEEP_PAGES, maxSitePages - deepPagesInspectedForSite - pending.length);
+        for (let count = 0; count < capacity && available.length; count += 1) {
+          const next = available.shift();
+          if (visited.has(next.url)) { skipped += 1; continue; }
+          pending.push({ url: next.original, depth: next.depth });
+          deep.deepLinksSelected += 1;
+        }
+        return pending.length > 0;
+      };
+      while ((pending.length || available.length) && candidates.length < maxResults && inspected < maxInspections && Date.now() < inspectionDeadline) {
         if (hooks.isCancelled?.()) break;
+        if (!pending.length && (siteDeepAccepted || !queueNextBatch())) break;
         const entry = pending.shift();
         const url = normalizeUrl(entry.url);
         if (!url || visited.has(url) || new URL(url).hostname !== hostname || !domainAllowed(url, query.whitelist, query.blacklist)) { skipped += 1; continue; }
         if (/\.(?:pdf|jpe?g|png|gif|webp|svg|mp[34]|zip|rar|docx?|xlsx?)(?:\?|$)/i.test(url)) { skipped += 1; continue; }
         visited.add(url); inspected += 1;
-        if (entry.depth) deep.deepPagesInspected += 1;
+        if (entry.depth) { deepPagesInspectedForSite += 1; deep.deepPagesInspected += 1; }
         else deep.rootInspected += 1;
         const snippetMatch = entry.depth === 0 && textMatches(`${item.title} ${item.snippet}`, query);
         try {
@@ -84,22 +98,24 @@ class YandexHTMLProvider extends SearchProvider {
             if ((!query.extractedDate || date) && inRange(date, query) && !candidateUrls.has(url)) {
               candidateUrls.add(url);
               candidates.push({ ...item, ...page, url: entry.url, date, normalized: url, snippetMatch, description: page.description || item.snippet });
-              if (entry.depth) deep.deepAccepted += 1;
+              if (entry.depth) { siteDeepAccepted += 1; deep.deepAccepted += 1; }
               hooks.onCandidate?.(candidates[candidates.length - 1]);
               matched = true;
             }
           }
           // Scan linked pages even when the landing page itself does not match.
           if (entry.depth < 2 && maxSitePages) {
-             const links = (page.links || []).map((link, index) => ({ url: normalizeUrl(link), original: link, index }))
-               .filter(link => link.url && /^https?:\/\//i.test(link.original) && new URL(link.url).hostname === hostname && !visited.has(link.url))
+             const links = (page.links || []).map(link => ({ url: normalizeUrl(link), original: link, depth: entry.depth + 1, index: linkOrder++ }))
+               .filter(link => link.url && /^https?:\/\//i.test(link.original) && new URL(link.url).hostname === hostname && !visited.has(link.url)
+                 && domainAllowed(link.url, query.whitelist, query.blacklist)
+                 && !/\.(?:pdf|jpe?g|png|gif|webp|svg|mp[34]|zip|rar|docx?|xlsx?)(?:\?|$)/i.test(link.url))
                .sort((a, b) => scoreDeepLink(b.url, query) - scoreDeepLink(a.url, query) || a.index - b.index);
              deep.deepLinksFound += links.length;
              for (const link of links) {
-               if (sitePages >= maxSitePages) break;
-               if (pending.some(next => normalizeUrl(next.url) === link.url)) continue;
-               pending.push({ url: link.original, depth: entry.depth + 1 }); sitePages += 1; deep.deepLinksSelected += 1;
-            }
+               if (pending.some(next => normalizeUrl(next.url) === link.url) || available.some(next => next.url === link.url)) continue;
+               available.push(link);
+             }
+             available.sort((a, b) => scoreDeepLink(b.url, query) - scoreDeepLink(a.url, query) || a.index - b.index);
           }
           hooks.onSitePage?.(inspected, url, candidates.length, matched);
         } catch (error) {
