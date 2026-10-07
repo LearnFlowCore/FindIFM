@@ -123,7 +123,7 @@ async function startServer(options = {}) {
       browserConnected: Boolean(browser.browser?.connected), semanticAvailable: semantic.configured(),
     });
   }));
-  app.post('/api/search', requireBody, asyncRoute(async (req, res) => {
+  app.post('/api/search', requireBody, rejectWhileBusy, asyncRoute(async (req, res) => {
     if (req.body.semantic === true && !semantic.configured()) return res.status(503).json({ error: 'Поиск по смыслу пока не настроен: нужен AI_API_KEY на сервере.' });
     const status = await checkInternet();
     if (!status.ok) { notify('failed', 'Поиск остановлен: нет интернет-соединения'); return res.status(503).json({ error: 'Нет интернет-соединения.' }); }
@@ -156,7 +156,7 @@ async function startServer(options = {}) {
   }));
   app.post('/api/jobs/:id/stop', asyncRoute(async (req, res) => await jobs.stop(req.params.id)
     ? res.json({ ok: true }) : res.status(409).json({ error: 'Задачу нельзя остановить.' })));
-  app.post('/api/jobs/:id/restart', asyncRoute(async (req, res) => {
+  app.post('/api/jobs/:id/restart', rejectWhileBusy, asyncRoute(async (req, res) => {
     const previous = repo.historyById(req.params.id);
     if (!previous) return res.status(404).json({ error: 'Задание не найдено.' });
     const query = JSON.parse(previous.query_json);
@@ -231,7 +231,7 @@ async function startServer(options = {}) {
       sourcesCount: repo.analyticsSummary(run.job_id).sources,
       ...merged, ...metrics(merged), mttr: mttrSummary(repo.mttrRuns()) });
   });
-  app.post('/api/history/:id/rerun', asyncRoute(async (req, res) => {
+  app.post('/api/history/:id/rerun', rejectWhileBusy, asyncRoute(async (req, res) => {
     const previous = repo.historyById(req.params.id);
     if (!previous) return res.status(404).json({ error: 'Запись истории не найдена.' });
     let query;
@@ -263,6 +263,7 @@ async function startServer(options = {}) {
     }
     if ('maxPages' in values && (!Number.isInteger(values.maxPages) || values.maxPages < 1 || values.maxPages > 100)) return res.status(400).json({ error: 'Количество страниц должно быть от 1 до 100.' });
     if ('maxResults' in values && (!Number.isInteger(values.maxResults) || values.maxResults < 1 || values.maxResults > 5000)) return res.status(400).json({ error: 'Лимит результатов должен быть от 1 до 5000.' });
+    if ('maxDeepPages' in values && (!Number.isInteger(values.maxDeepPages) || values.maxDeepPages < 0 || values.maxDeepPages > 12)) return res.status(400).json({ error: 'Лимит внутренних страниц должен быть от 0 до 12.' });
     if ('maxDurationMinutes' in values && (!Number.isInteger(values.maxDurationMinutes) || values.maxDurationMinutes < 1 || values.maxDurationMinutes > 240)) return res.status(400).json({ error: 'Лимит времени должен быть от 1 до 240 минут.' });
     if (values.browserPath && (path.basename(values.browserPath).toLowerCase() !== 'browser.exe' || !fs.existsSync(values.browserPath))) return res.status(400).json({ error: 'Укажите существующий browser.exe Яндекс Браузера.' });
     if (values.profileType && !['temporary', 'user'].includes(values.profileType)) return res.status(400).json({ error: 'Некорректный профиль.' });

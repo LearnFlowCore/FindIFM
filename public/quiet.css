@@ -1,4 +1,10 @@
 .quiet-group { margin: 16px 0; }
+.primary-search-grid { grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); margin-bottom: 8px; }
+.primary-search-grid .field { min-width: 0; }
+.primary-search-grid input { font-size: 16px; }
+.search-options { margin-top: 12px !important; }
+.search-options > .form-grid { margin: 14px 0; }
+@media (max-width: 650px) { .primary-search-grid { grid-template-columns: minmax(0, 1fr); } }
 .quiet-group > summary { width: fit-content; padding: 8px 0; color: #355d51; font-weight: 650; cursor: pointer; }
 .quiet-group > summary:hover { color: #a85135; }
 .quiet-group > summary:focus-visible { outline: 2px solid #d66b43; outline-offset: 4px; }

@@ -33,6 +33,23 @@ test('быстрый тест ограничивает выдачу одной �
   assert.match(jobs.get(id).textFile, /FindIFM_/);
 });
 
+test('не ставит второй поиск в очередь при уже работающем поиске', async () => {
+  const repo = repository();
+  let finish;
+  let calls = 0;
+  const provider = { browser: { close: async () => {} }, search: () => ++calls === 1
+    ? new Promise(resolve => { finish = resolve; }) : Promise.resolve({ candidates: [], withinDuplicates: 0 }) };
+  const jobs = new JobManager(repo, provider, { error() {} }, () => {}, async () => ({ ok: true }));
+  jobs.start({ query: 'первый' });
+  assert.throws(() => jobs.start({ query: 'второй' }), error => error.statusCode === 409 && /Дождитесь/.test(error.message));
+  while (!finish) await new Promise(resolve => setTimeout(resolve, 1));
+  finish({ candidates: [], withinDuplicates: 0 });
+  await jobs.waitForIdle();
+  assert.equal(jobs.isBusy(), false);
+  jobs.start({ query: 'следующий' });
+  await jobs.waitForIdle();
+});
+
 test('остановка отменяет сохранение результатов и завершает задачу', async () => {
   const repo = repository();
   let resolveSearch;

@@ -2,6 +2,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { parseQuery, buildYandexText, textMatches } = require('../src/utils/query');
 
+test('обычный поиск сохраняет глубокий обход, уменьшить его можно явно', () => {
+  assert.equal(parseQuery({ query: 'Министерство' }).deepPages, 12);
+  assert.equal(parseQuery({ query: 'Министерство', deepPages: 0 }).deepPages, 0);
+});
+
 test('извлекает дату и удаляет ее из поискового текста', () => {
   const query = parseQuery({ query: 'Иванов совершил действие 15.03.2024', period: 'week' });
   assert.equal(query.text, 'Иванов совершил действие');

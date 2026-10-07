@@ -13,6 +13,7 @@ class JobManager {
   }
   start(input) {
     if (!this.accepting) throw new Error('Приложение завершает работу и не принимает новые задания.');
+    if (this.isBusy()) { const error = new Error('Дождитесь завершения текущего поиска.'); error.statusCode = 409; throw error; }
     const query = parseQuery(input);
     const id = crypto.randomUUID();
     this.captchaTokens.set(id, crypto.randomBytes(32).toString('hex'));
@@ -73,6 +74,10 @@ class JobManager {
           if (checked === 1 || checked % 10 === 0) this.repo.addTaskLog(id, 'info', 'site_page', job.message, { checked, url, found });
         },
         onSiteError: () => { job.skippedErrors += 1; },
+        onSearchStats: stats => {
+          job.searchStats = stats;
+          this.repo.addTaskLog(id, 'info', 'search_stats', `Найдено: ${stats.found}, повторов: ${stats.duplicates}, загружено: ${stats.inspected}, пропущено: ${stats.skipped}, принято: ${stats.accepted}`, stats);
+        },
         onCandidate: item => {
           if (!validHttpUrl(item.url)) return;
           job.liveMatches += 1;
