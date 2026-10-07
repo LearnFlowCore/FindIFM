@@ -145,6 +145,14 @@ async function startServer(options = {}) {
   app.get('/api/jobs/:id', jobStatus);
   app.get('/api/jobs', (req, res) => res.json(jobs.list(req.query.status)));
   app.get('/api/jobs/:id/logs', (req, res) => res.json(jobs.logs(req.params.id, req.query.limit)));
+  app.get('/api/jobs/:id/captcha/access', (req, res) => {
+    const job = jobs.get(req.params.id);
+    if (!job) return res.status(404).json({ error: 'Задание не найдено.' });
+    if (job.status !== 'waiting_captcha') return res.status(409).json({ error: 'Задание не ожидает CAPTCHA.' });
+    const captchaToken = jobs.captchaToken(req.params.id);
+    if (!captchaToken) return res.status(409).json({ error: 'Доступ к CAPTCHA недоступен.' });
+    return res.set('Cache-Control', 'no-store').json({ captchaToken });
+  });
   const requireCaptchaAccess = (req, res, next) => jobs.canControlCaptcha(req.params.id, req.get('X-Captcha-Token'))
     ? next() : res.status(403).json({ error: 'Нет доступа к активной CAPTCHA этой задачи.' });
   app.get('/api/jobs/:id/captcha', requireCaptchaAccess, asyncRoute(async (_req, res) => {
@@ -359,7 +367,7 @@ async function startServer(options = {}) {
     logFile.end?.();
   }
 
-  return { app, server, url, token, checkInternet, stop, config };
+  return { app, server, url, token, checkInternet, stop, config, jobs };
 }
 
 if (require.main === module) {

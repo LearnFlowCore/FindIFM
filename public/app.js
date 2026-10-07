@@ -3,7 +3,8 @@
   // Панель использует только локальный API; внешних frontend-зависимостей нет.
   const $ = (s, root = document) => root.querySelector(s);
   const $$ = (s, root = document) => [...root.querySelectorAll(s)];
-  const appToken = new URLSearchParams(location.hash.slice(1)).get('token') || '';
+  const appToken = new URLSearchParams(location.hash.slice(1)).get('token') || sessionStorage.getItem('signal-app-token') || '';
+  if (appToken) sessionStorage.setItem('signal-app-token', appToken);
   window.signalAppToken = appToken;
   if (location.hash) history.replaceState(null, '', `${location.pathname}${location.search}`);
   const state = { tab: 'search', jobId: null, captchaToken: null, searching: false, page: 1, pageSize: 200, sort: 'search_date', order: 'desc', results: [], resultGroups: [], total: 0, resultsRequest: 0, history: [], saved: [], savedSelected: null, savedPage: 1, presets: [], settings: {} };
@@ -74,11 +75,19 @@
   function formObject(form) { const data = Object.fromEntries(new FormData(form)); data.semantic = !!form.semantic.checked; data.exactPhrase = !!form.exact.checked && !data.semantic; data.matchMode = data.semantic ? 'all' : data.exactPhrase ? 'exact' : data.matchMode; data.deduplicate = !!form.deduplicate.checked; data.whitelist = jsonList(data.whitelist); data.blacklist = jsonList(data.blacklist); data.includeKeywords = jsonList(data.includeKeywords); data.excludeKeywords = jsonList(data.excludeKeywords); data.minTextLength = Number(data.minTextLength || 0); data.maxTextLength = Number(data.maxTextLength || 0); if (data.date) { data.from = data.date; data.to = data.date; } delete data.date; if (data.period === 'none' || (data.from && data.to)) delete data.period; return data; }
   function fillForm(data) { const form = $('#searchForm'); const query = data.text || data.query || ''; form.query.value = query; form.exact.checked = !!(data.exactPhrase || data.exact); form.period.value = data.period || 'none'; form.date.value = data.from && data.from === data.to ? data.from : ''; form.from.value = form.date.value ? '' : data.from || ''; form.to.value = form.date.value ? '' : data.to || ''; form.whitelist.value = jsonList(data.whitelist).join('\n'); form.blacklist.value = jsonList(data.blacklist).join('\n'); if (form.sentiment) form.sentiment.value = data.sentiment || 'any'; if (data.preset) form.preset.value = data.preset; }
   async function launch(event, quickTest = false) { event.preventDefault(); if (state.searching) return; const button = quickTest ? $('#quickTestButton') : $('#launchButton'); state.searching = true; $('#launchButton').disabled = true; $('#quickTestButton').disabled = true; if (!quickTest) button.querySelector('span').textContent = 'Сбор данных...'; else button.textContent = 'Проверяем страницу...'; try { const result = await api(quickTest ? '/api/search/test' : '/api/search', { method: 'POST', body: JSON.stringify(formObject(event.target)) }); state.jobId = result.jobId; window.dispatchEvent(new CustomEvent('signal-job-selected', { detail: { jobId: result.jobId } })); state.captchaToken = result.captchaToken; state.page = 1; setStopVisible(true); notify(quickTest ? 'Быстрый тест запущен' : 'Сбор и анализ запущены'); await pollJob(result.jobId); } catch (e) { notify(e.message, true); } finally { state.searching = false; $('#launchButton').disabled = false; $('#quickTestButton').disabled = false; if (!quickTest) button.querySelector('span').textContent = 'Запустить сбор и анализ'; else button.textContent = 'Тест 1 страница'; } }
+  let pollingJobId = null;
   async function pollJob(id) {
-    for (;;) {
+    if (pollingJobId) return;
+    pollingJobId = id;
+    try {
+      for (;;) {
       let job;
       try { job = await api(`/api/search/${encodeURIComponent(id)}`); }
       catch (e) { notify(e.message, true); return; }
+      if (job.status === 'waiting_captcha' && !state.captchaToken) {
+        try { state.captchaToken = (await api(`/api/jobs/${encodeURIComponent(id)}/captcha/access`)).captchaToken; }
+        catch (error) { notify(error.message, true); }
+      }
       const progress = Number(job.progress || 0);
       $('#liveRegion').textContent = `Поиск: ${progress} процентов, статус ${job.status}`;
       renderKeywordMonitor(job);
@@ -114,7 +123,33 @@
       renderResults();
       $('#resultsSummary').textContent = `Поиск идёт · ${state.total} предварительных публикаций · ${progress}%`;
       await new Promise(resolve => setTimeout(resolve, 1200));
-    }
+      }
+    } finally { pollingJobId = null; }
+  }
+  async function restoreActiveJob() {
+    try {
+      const jobs = await api('/api/jobs');
+      if (state.jobId || pollingJobId || !Array.isArray(jobs)) return false;
+      const current = jobs.map(item => item.live).filter(Boolean);
+      const active = ['waiting_captcha', 'running', 'queued']
+        .map(status => current.find(job => job.status === status)).find(Boolean);
+      if (!active) return false;
+      let captchaToken = null;
+      if (active.status === 'waiting_captcha') {
+        try { captchaToken = (await api(`/api/jobs/${encodeURIComponent(active.id)}/captcha/access`)).captchaToken; }
+        catch (error) {
+          // The CAPTCHA can be solved between listing jobs and requesting access.
+          const latest = await api(`/api/jobs/${encodeURIComponent(active.id)}`);
+          if (!['queued', 'running'].includes(latest.status)) throw error;
+        }
+      }
+      if (state.jobId || pollingJobId) return false;
+      state.jobId = active.id;
+      state.captchaToken = captchaToken;
+      window.dispatchEvent(new CustomEvent('signal-job-selected', { detail: { jobId: active.id } }));
+      pollJob(active.id);
+      return true;
+    } catch (error) { notify(error.message, true); return false; }
   }
   async function loadResults() { if (state.previewActive) return; const request = ++state.resultsRequest; const params = new URLSearchParams({ page: state.page, limit: state.pageSize, sort: state.sort, order: state.order, q: $('#tableSearch').value.trim(), domain: $('#domainFilter')?.value.trim() || '', status: $('#statusFilter')?.value || '', dateFrom: $('#dateFromFilter')?.value || '', dateTo: $('#dateToFilter')?.value || '', category: $('#categoryFilter')?.value.trim() || '', minTextLength: $('#minLengthFilter')?.value || '', maxTextLength: $('#maxLengthFilter')?.value || '', hasMedia: $('#mediaFilter')?.value || '', includeKeywords: $('#includeFilter')?.value.trim() || '', excludeKeywords: $('#excludeFilter')?.value.trim() || '', includeUnknownDate: $('#unknownDate').checked ? 'true' : 'false' }); if (state.jobId) params.set('jobId', state.jobId); try { const data = await api(`/api/results?${params}`); if (request !== state.resultsRequest || state.previewActive) return; state.results = data.rows || []; state.resultGroups = data.groups || []; state.summary = data.summary || {}; state.total = Number(data.total || 0); renderResults(); } catch (e) { if (request === state.resultsRequest) notify(e.message, true); } }
   function renderResults() { const rows = state.results; const summary = state.summary || {}; const linkCount = Number(summary.publications ?? state.total ?? 0); $('#resultCount').textContent = linkCount; $('#resultsEmpty').hidden = rows.length > 0; $('#resultsSummary').textContent = linkCount ? `Найдено ссылок: ${linkCount}. СМИ: ${Number(summary.media || 0)}${summary.date_from || summary.date_to ? ` · период ${summary.date_from || 'начало'} — ${summary.date_to || 'сегодня'}` : ''}` : 'По заданным ключевым словам публикации не найдены'; const summaries = state.resultGroups.map(group => `<tr class="result-group"><td colspan="7"><strong>Ключевое упоминание: ${escape(group.query || 'Без запроса')}</strong><span>${Number(group.count || 0)} публикаций · ${Number(group.domains || 0)} сайтов</span></td></tr>`).join(''); const items = rows.map(row => `<tr><td><a class="result-title" href="${escape(row.url)}" target="_blank" rel="noopener">${escape(row.title || 'Открыть публикацию')}</a><span class="domain"><a href="${escape(row.url)}" target="_blank" rel="noopener">${escape(row.url)}</a></span></td><td class="domain">${escape(row.domain)}</td><td class="date">${escape(row.date || 'Не определена')}</td><td><span class="description">${escape(row.description)}</span></td><td><span class="pill ${row.status === 'новый' ? 'pending' : row.status === 'уже найден ранее' ? 'failed' : 'success'}">${escape(row.status || 'новый')}</span></td><td class="domain">${escape(row.query || '')}</td><td><button class="mini-button delete" data-delete-result="${escape(row.id)}">Удалить</button></td></tr>`).join(''); $('#resultsBody').innerHTML = summaries + items; $('#pageInfo').textContent = `${linkCount} результатов`; const pages = Math.max(1, Math.ceil(state.total / state.pageSize)); const first = Math.max(1, Math.min(state.page - 3, pages - 6)); $('#pagination').innerHTML = Array.from({ length: Math.min(pages, 7) }, (_, i) => first + i).map(page => `<button class="page-button ${page === state.page ? 'active' : ''}" data-page="${page}">${page}</button>`).join(''); }
@@ -463,5 +498,5 @@
   $('#searchForm .form-footer').insertAdjacentHTML('beforeend', '<button class="button danger stop-search-button" type="button" hidden>■ Остановить поиск</button>');
   $('#resultsView .section-intro').insertAdjacentHTML('beforeend', '<button class="button danger stop-search-button" type="button" hidden>■ Остановить поиск</button>');
   $$('.stop-search-button').forEach(button => button.addEventListener('click', async () => { if (!state.jobId || button.disabled) return; $$('.stop-search-button').forEach(item => { item.disabled = true; item.textContent = 'Останавливаем...'; }); try { await api(`/api/jobs/${encodeURIComponent(state.jobId)}/stop`, { method: 'POST', body: '{}' }); notify('Остановка поиска запрошена'); } catch (error) { notify(error.message, true); $$('.stop-search-button').forEach(item => { item.disabled = false; item.textContent = '■ Остановить поиск'; }); } }));
-  status(); setInterval(status, 10000); setInterval(() => { if (state.tab === 'admin') loadTasks(); }, 5000); loadPresets(); loadSettings(); loadHistory(); loadSavedArchive();
+  status(); setInterval(status, 10000); setInterval(() => { if (state.tab === 'admin') loadTasks(); }, 5000); loadPresets(); loadSettings(); loadHistory(); loadSavedArchive(); restoreActiveJob();
 }());
