@@ -8,12 +8,15 @@
   let appToken = validJob ? sessionStorage.getItem(`signal-captcha-app-${jobId}`) || '' : '';
   let waiting = true;
   let dragging = false;
+  let mousePressed = false;
   let loading = false;
   let submitting = false;
   let refreshTimers = [];
   let actions = Promise.resolve();
   let lastMove = 0;
   let selectedPoint = null;
+  let screenshotWidth = 0;
+  let screenshotHeight = 0;
   let cookieDismissed = false;
   const img = $('image');
   $('showCookiePage').addEventListener('click', () => { cookieDismissed = true; $('cookieOverlay').hidden = true; });
@@ -64,11 +67,13 @@
       await action();
       $('submitMessage').textContent = 'Проверяем ответ Яндекса…';
       setStatus('Проверяем ответ…');
+      // Покажем настоящий ответ Яндекса (в том числе галочку), пока проверка
+      // не закрыла окно CAPTCHA и не возобновила поиск.
+      await refreshImage();
       await checkJob();
       if (waiting) {
-        await refreshImage();
         setHint('Ответ отправлен. Если Яндекс показывает новое задание, продолжите проверку.');
-        refreshTimers = [800, 1800].map(delay => setTimeout(() => { checkJob(); refreshImage(); }, delay));
+        refreshTimers = [350, 1000, 1800].map(delay => setTimeout(() => { refreshImage(); checkJob(); }, delay));
       }
     } catch (error) { setHint(`Не удалось отправить ответ: ${error.message}`); }
     finally { finishSubmitFeedback(); }
@@ -105,8 +110,8 @@
     const img = $('image');
     const rect = img.getBoundingClientRect();
     return {
-      x: Math.round(Math.max(0, Math.min(img.naturalWidth - 1, (event.clientX - rect.left) * img.naturalWidth / rect.width))),
-      y: Math.round(Math.max(0, Math.min(img.naturalHeight - 1, (event.clientY - rect.top) * img.naturalHeight / rect.height))),
+      x: Math.round(Math.max(0, Math.min(screenshotWidth - 1, (event.clientX - rect.left) * screenshotWidth / rect.width))),
+      y: Math.round(Math.max(0, Math.min(screenshotHeight - 1, (event.clientY - rect.top) * screenshotHeight / rect.height))),
     };
   }
   async function refreshImage() {
@@ -115,6 +120,8 @@
     try {
       const screenshot = await captchaRequest();
       if (waiting && !dragging) {
+        screenshotWidth = screenshot.width;
+        screenshotHeight = screenshot.height;
         img.src = screenshot.image; if (!submitting) setStatus('Ожидаем вашего ответа');
         if (!screenshot.cookieConsent) cookieDismissed = false;
         const showConsent = Boolean(screenshot.cookieConsent) && !cookieDismissed;
@@ -172,9 +179,9 @@
   if (!token) setHint('Получаем доступ к проверке от основной вкладки...');
 
   img.addEventListener('pointerdown', event => {
-    if (!event.isPrimary || !waiting || submitting || !token || !img.naturalWidth) return;
+    if (!event.isPrimary || !waiting || submitting || !token || !screenshotWidth) return;
     if (event.pointerType === 'mouse') {
-      if (event.button === 0) { selectedPoint = coords(event); img.focus(); setHint('Точка выбрана. Нажмите Enter или пробел для передачи нажатия Яндексу.'); }
+      if (event.button === 0) { mousePressed = true; selectedPoint = coords(event); img.setPointerCapture(event.pointerId); img.focus(); }
       return;
     }
     event.preventDefault();
@@ -186,18 +193,27 @@
     send({ type: 'down', ...coords(event) });
   });
   img.addEventListener('pointermove', event => {
-    if (event.pointerType === 'mouse' && img.naturalWidth) selectedPoint = coords(event);
+    if (event.pointerType === 'mouse' && screenshotWidth) selectedPoint = coords(event);
     if (!dragging || Date.now() - lastMove < 65) return;
     lastMove = Date.now();
     send({ type: 'move', ...coords(event) });
   });
   function finishDrag(event) {
+    if (event.pointerType === 'mouse') {
+      const clicked = mousePressed && event.button === 0 && !submitting && waiting && token;
+      mousePressed = false;
+      if (clicked) {
+        selectedPoint = coords(event);
+        submitAnswer(() => send({ type: 'click', ...selectedPoint }));
+      }
+      return;
+    }
     if (!dragging) return;
     dragging = false;
     submitAnswer(() => send({ type: 'up', ...coords(event) }));
   }
   img.addEventListener('pointerup', finishDrag);
-  img.addEventListener('pointercancel', () => { if (!dragging) return; dragging = false; send({ type: 'up', ...selectedPoint }).catch(() => {}); });
+  img.addEventListener('pointercancel', () => { mousePressed = false; if (!dragging) return; dragging = false; send({ type: 'up', ...selectedPoint }).catch(() => {}); });
   img.addEventListener('keydown', event => {
     if (!['Enter', ' '].includes(event.key) || !selectedPoint || submitting || !waiting || !token) return;
     event.preventDefault();
