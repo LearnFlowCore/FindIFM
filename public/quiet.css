@@ -259,3 +259,9 @@ tbody tr:hover { background: #f6f8ff; }
 .voice-reach-form input { width: 175px; max-width: 100%; padding: 9px; border: 1px solid #cad7cb; border-radius: 7px; }
 .voice-message { color: #597168; }
 @media (max-width: 480px) { .voice-reach-form label, .voice-reach-form input { width: 100%; } }
+.report-links { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.report-links ol { max-height: 42vh; overflow-y: auto; padding-left: 24px; overflow-wrap: anywhere; }
+.report-links li { padding: 9px 4px; border-bottom: 1px solid var(--line); }
+.report-links li a, .report-links li small, .report-links li span { display: block; }
+.report-links li small { color: var(--muted); word-break: break-all; }
+.report-links li span { font-size: 12px; color: var(--muted); }

@@ -75,3 +75,13 @@ test('передаёт публикации по мере проверки и с
   assert.equal(inspections, 1);
   assert.equal(found.length, 1);
 });
+
+test('при истечении CAPTCHA обрабатывает страницы до остановки и отмечает поиск приостановленным', async () => {
+  const browser = {
+    collect: async () => { const error = new Error('CAPTCHA'); error.code = 'CAPTCHA_TIMEOUT'; error.partialSearchRows = [{ url: 'https://example.org/one', title: 'Ромашка', snippet: 'Ромашка' }]; throw error; },
+    inspect: async () => ({ title: 'Ромашка', text: 'Ромашка', links: [] }),
+  };
+  const result = await new YandexHTMLProvider(browser, { warn() {} }).search(parseQuery({ query: 'Ромашка' }), { deadlineAt: Date.now() - 1 });
+  assert.equal(result.pausedCaptcha, true);
+  assert.equal(result.candidates.length, 1);
+});

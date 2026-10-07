@@ -166,7 +166,8 @@ async function startServer(options = {}) {
   }));
   app.post('/api/jobs/:id/resume', asyncRoute(async (req, res) => {
     if (!await jobs.resume(req.params.id)) return res.status(409).json({ error: 'Это задание нельзя продолжить.' });
-    return res.status(202).json({ jobId: req.params.id, captchaToken: jobs.captchaToken(req.params.id) });
+    const jobId = repo.historyById(req.params.id).job_id;
+    return res.status(202).json({ jobId, captchaToken: jobs.captchaToken(jobId) });
   }));
   app.get('/api/results', (req, res) => res.json(repo.results({
     jobId: req.query.jobId, page: req.query.page, limit: req.query.limit || req.query.pageSize,
@@ -293,7 +294,8 @@ async function startServer(options = {}) {
     if (format === 'xlsx') await exportXlsx(rows, destination);
     else if (format === 'csv') exportCsv(rows, destination, { full: true });
     else exportTxt(rows, destination);
-    return res.json({ file, count: rows.length, url: `/exports/${encodeURIComponent(file)}${token ? `?token=${encodeURIComponent(token)}` : ''}` });
+    return res.json({ file, count: rows.length, results: rows.map(row => ({ url: row.url, title: row.title, sentiment: row.sentiment })),
+      url: `/exports/${encodeURIComponent(file)}${token ? `?token=${encodeURIComponent(token)}` : ''}` });
   }));
   app.post('/api/export/txt', requireBody, asyncRoute(async (req, res) => {
     const rows = repo.allResults(req.body.jobId || null);

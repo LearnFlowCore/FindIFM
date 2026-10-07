@@ -1,6 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { JobManager } = require('../src/jobs');
+const { openDatabase } = require('../src/db');
+const { Repository } = require('../src/repository');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
 function repository() {
   const entries = [];
@@ -71,4 +76,32 @@ test('истёкшая CAPTCHA ставит задачу на паузу и пр
   await jobs.waitForIdle();
   assert.equal(resumePage, 3);
   assert.equal(jobs.get(id).status, 'completed');
+});
+
+test('при непройденной CAPTCHA сохраняет найденное с тональностью и дополняет после возобновления', async () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'signal-paused-'));
+  const db = openDatabase(path.join(folder, 'search.db'));
+  try {
+    const repo = new Repository(db);
+    let attempt = 0;
+    const make = (url, sentiment) => ({ url, normalized: url, title: 'Ромашка', date: '2026-10-01', description: 'Ромашка открыла завод', sentiment });
+    const provider = { browser: { close: async () => {} }, search: async (query, _settings, hooks) => {
+      attempt += 1;
+      hooks.onSearchPage(attempt === 1 ? 2 : 3);
+      return { candidates: attempt === 1 ? [make('https://example.org/one', 'positive')] : [make('https://example.org/one', 'positive'), make('https://example.org/two', 'negative')], withinDuplicates: 0, pausedCaptcha: attempt === 1 };
+    } };
+    const jobs = new JobManager(repo, provider, { error() {} }, () => {}, async () => ({ ok: true }));
+    const id = jobs.start({ query: 'Ромашка' });
+    await jobs.waitForIdle();
+    assert.equal(jobs.get(id).status, 'paused_captcha');
+    assert.equal(repo.historyById(id).results_count, 1);
+    assert.equal(repo.allResults(id)[0].sentiment, 'positive');
+    assert.equal(jobs.get(id).resultsCount, 1);
+    const restarted = new JobManager(repo, provider, { error() {} }, () => {}, async () => ({ ok: true }));
+    assert.equal(await restarted.resume(String(repo.historyById(id).id)), true);
+    await restarted.waitForIdle();
+    assert.equal(restarted.get(id).status, 'completed');
+    assert.equal(repo.historyById(id).results_count, 2);
+    assert.deepEqual(repo.allResults(id).map(row => row.sentiment).sort(), ['negative', 'positive']);
+  } finally { db.close(); fs.rmSync(folder, { recursive: true, force: true }); }
 });

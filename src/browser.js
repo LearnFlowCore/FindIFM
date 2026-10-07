@@ -103,7 +103,7 @@ class YandexBrowser {
         while (page && !page.isClosed()) {
           if (hooks.isCancelled?.()) throw new Error('Поиск остановлен пользователем');
           if (Date.now() >= expiresAt) throw new CaptchaError('Время ручного подтверждения CAPTCHA истекло (15 минут).', 'CAPTCHA_TIMEOUT');
-          await sleep(2000);
+           await sleep(750);
           if (!(await this.isCaptcha(page))) { hooks.onCaptchaSolved?.(); return true; }
         }
         throw new CaptchaError('Окно CAPTCHA закрыто до подтверждения.');
@@ -230,6 +230,9 @@ class YandexBrowser {
         await sleep(randomDelay(settings.pageDelay, settings.pageJitter));
       }
       return collected;
+    } catch (error) {
+      if (error.code === 'CAPTCHA_TIMEOUT') error.partialSearchRows = collected.slice();
+      throw error;
     } finally {
       if (this.captchaPage === page) this.captchaPage = null;
       if (!page.isClosed()) {

@@ -28,7 +28,14 @@ class YandexHTMLProvider extends SearchProvider {
   async search(query, settings, hooks = {}) {
     const deadline = settings.deadlineAt || Date.now() + Math.max(1, Number(settings.maxDurationMinutes) || 30) * 60000;
     query.yandexText = buildYandexText(query);
-    const raw = await this.browser.collect(query, settings, hooks);
+    let raw, pausedCaptcha = false;
+    try { raw = await this.browser.collect(query, settings, hooks); }
+    catch (error) {
+      if (error.code !== 'CAPTCHA_TIMEOUT') throw error;
+      raw = error.partialSearchRows || [];
+      pausedCaptcha = true;
+    }
+    const inspectionDeadline = pausedCaptcha ? Date.now() + 5 * 60000 : deadline;
     const candidates = [], seen = new Set(), candidateUrls = new Set(), visited = new Set(); let withinDuplicates = 0;
     const maxResults = Number(settings.maxResults) || 500;
     const maxSitePages = query.deepPages ?? 12;
@@ -36,7 +43,7 @@ class YandexHTMLProvider extends SearchProvider {
     let inspected = 0;
     for (const item of raw) {
       if (hooks.isCancelled?.()) break;
-      if (candidates.length >= maxResults || Date.now() >= deadline || inspected >= maxInspections) break;
+      if (candidates.length >= maxResults || Date.now() >= inspectionDeadline || inspected >= maxInspections) break;
       const normalized = normalizeUrl(item.url);
       if (!normalized || /(^|\.)yandex\.(ru|com)$/i.test(new URL(normalized).hostname)) continue;
       if (seen.has(normalized)) { withinDuplicates += 1; continue; }
@@ -45,7 +52,7 @@ class YandexHTMLProvider extends SearchProvider {
       const hostname = new URL(normalized).hostname;
       const pending = [{ url: item.url, depth: 0 }];
       let sitePages = 0;
-      while (pending.length && candidates.length < maxResults && inspected < maxInspections && Date.now() < deadline) {
+      while (pending.length && candidates.length < maxResults && inspected < maxInspections && Date.now() < inspectionDeadline) {
         if (hooks.isCancelled?.()) break;
         const entry = pending.shift();
         const url = normalizeUrl(entry.url);
@@ -89,7 +96,7 @@ class YandexHTMLProvider extends SearchProvider {
         }
       }
     }
-    return { candidates, withinDuplicates };
+    return { candidates, withinDuplicates, pausedCaptcha };
   }
 }
 module.exports = { SearchProvider, YandexHTMLProvider, YandexAPIProvider, inRange, passesContentFilters };

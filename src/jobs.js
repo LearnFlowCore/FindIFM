@@ -40,7 +40,7 @@ class JobManager {
        if (query.quickTest) { settings.maxPages = 1; settings.maxResults = 5; settings.maxDurationMinutes = Math.min(settings.maxDurationMinutes, 5); query.deepPages = 0; }
        job.deadlineAt = Date.now() + Math.max(1, Number(settings.maxDurationMinutes) || 30) * 60000;
        settings.deadlineAt = job.deadlineAt;
-       const { candidates, withinDuplicates } = await this.provider.search(query, settings, {
+        const { candidates, withinDuplicates, pausedCaptcha = false } = await this.provider.search(query, settings, {
         isCancelled: () => Boolean(job.cancelled),
         onCaptcha: () => {
           job.captcha = true; job.status = 'waiting_captcha'; job.message = settings.captchaStrategy === 'skip'
@@ -91,11 +91,12 @@ class JobManager {
       }
       job.progress = 85;
       this.repo.updateTask(id, 'running', 85, 'Формирование результатов');
-       const rows = [], now = new Date().toISOString(), historical = new Set(), titles = new Set(), sourceIds = new Set();
+        const rows = [], now = new Date().toISOString(), historical = new Set(), titles = new Set(), sourceIds = new Set();
       let duplicates = withinDuplicates; job.duplicatesCount = duplicates;
        for (const item of candidates) {
          if (job.cancelled) throw new Error('Поиск остановлен пользователем');
-        if (!validHttpUrl(item.url)) { this.repo.addTaskLog(id, 'warn', 'validation', 'Пропущена некорректная ссылка', { url: item.url }); continue; }
+         if (!validHttpUrl(item.url)) { this.repo.addTaskLog(id, 'warn', 'validation', 'Пропущена некорректная ссылка', { url: item.url }); continue; }
+         if (this.repo.hasJobUrl?.(id, item.normalized)) continue;
         const normalizedTitle = titleKey(item.title);
         const itemSourceId = sourceId(item.url);
         const duplicate = this.repo.hasUrl(item.normalized) || historical.has(item.normalized);
@@ -114,10 +115,18 @@ class JobManager {
            evidence: item.evidence || '', semanticScore: item.semanticScore ?? null, sentiment: item.sentiment || 'neutral',
         });
       }
-      this.repo.addResults(id, rows);
-       const textFile = exportTxtSnapshot(rows, id);
-       Object.assign(job, { status: 'completed', progress: 100, captcha: false, results: rows, liveResults: [], resultsCount: rows.length, duplicatesCount: duplicates, textFile });
-      this.repo.finishHistory(id, 'completed', rows.length, duplicates);
+       if (rows.length) this.repo.addResults(id, rows);
+       const allRows = this.repo.allResults?.(id) || rows;
+        const textFile = exportTxtSnapshot(allRows, id);
+        Object.assign(job, { status: pausedCaptcha ? 'paused_captcha' : 'completed', progress: pausedCaptcha ? job.progress : 100, captcha: false, results: allRows, liveResults: [], resultsCount: allRows.length, duplicatesCount: duplicates, textFile });
+       if (pausedCaptcha) {
+         this.repo.updatePartialResults?.(id);
+         job.message = 'Ожидание CAPTCHA истекло. Полученные ссылки сохранены; поиск можно продолжить с этой страницы.';
+         this.repo.updateTask(id, 'paused_captcha', job.progress, job.message);
+         this.repo.addTaskLog(id, 'warn', 'captcha_paused', job.message, { resumePage: query.resumePage || 0, results: allRows.length });
+         return;
+       }
+       this.repo.finishHistory(id, 'completed', allRows.length, duplicates);
       this.repo.addTaskLog(id, 'info', 'completed', `Завершено: ${rows.length} результатов`);
        this.notify(rows.length ? 'new-data' : 'completed', query.quickTest
          ? `Тест одной страницы завершён: ${rows.length} результатов. Файл сохранён: ${textFile}`
@@ -166,10 +175,22 @@ class JobManager {
     return true;
   }
   async resume(id) {
-    const job = this.jobs.get(id);
+    let job = this.jobs.get(id);
+    if (!job) {
+      const saved = this.repo.historyById(id);
+      if (saved?.status === 'paused_captcha') {
+        const query = JSON.parse(saved.query_json);
+        job = { id: saved.job_id, query, status: 'paused_captcha', progress: saved.progress || 0,
+          results: [], liveResults: [], resultsCount: saved.results_count || 0, duplicatesCount: saved.duplicates_count || 0,
+          captcha: false, error: saved.error, checkedPages: 0, liveMatches: 0, skippedErrors: 0, recentChecks: [] };
+        this.jobs.set(saved.job_id, job);
+      }
+    }
     if (!job || job.status !== 'paused_captcha') return false;
     if (this.isBusy()) throw new Error('Дождитесь завершения другого поиска.');
+    id = job.id;
     const query = JSON.parse(JSON.stringify(job.query));
+    job.query = query;
     job.cancelled = false; job.status = 'queued'; job.error = null; job.message = 'Поиск поставлен в очередь для продолжения';
     this.repo.updateTask(id, 'queued', job.progress, job.message);
     this.repo.addTaskLog(id, 'info', 'resumed', `Продолжение с страницы ${Number(query.resumePage || 0) + 1}`);

@@ -13,6 +13,7 @@
   let refreshTimers = [];
   let actions = Promise.resolve();
   let lastMove = 0;
+  let selectedPoint = null;
   let cookieDismissed = false;
   const img = $('image');
   $('showCookiePage').addEventListener('click', () => { cookieDismissed = true; $('cookieOverlay').hidden = true; });
@@ -63,12 +64,11 @@
       await action();
       $('submitMessage').textContent = 'Проверяем ответ Яндекса…';
       setStatus('Проверяем ответ…');
-      await new Promise(resolve => setTimeout(resolve, 450));
-      await refreshImage();
       await checkJob();
       if (waiting) {
+        await refreshImage();
         setHint('Ответ отправлен. Если Яндекс показывает новое задание, продолжите проверку.');
-        refreshTimers = [1500, 3000].map(delay => setTimeout(refreshImage, delay));
+        refreshTimers = [800, 1800].map(delay => setTimeout(() => { checkJob(); refreshImage(); }, delay));
       }
     } catch (error) { setHint(`Не удалось отправить ответ: ${error.message}`); }
     finally { finishSubmitFeedback(); }
@@ -172,15 +172,21 @@
   if (!token) setHint('Получаем доступ к проверке от основной вкладки...');
 
   img.addEventListener('pointerdown', event => {
-    if (!waiting || submitting || !token || !img.naturalWidth) return;
+    if (!event.isPrimary || !waiting || submitting || !token || !img.naturalWidth) return;
+    if (event.pointerType === 'mouse') {
+      if (event.button === 0) { selectedPoint = coords(event); img.focus(); setHint('Точка выбрана. Нажмите Enter или пробел для передачи нажатия Яндексу.'); }
+      return;
+    }
     event.preventDefault();
     img.setPointerCapture(event.pointerId);
     dragging = true;
     lastMove = 0;
+    selectedPoint = coords(event);
     setHint('Касание передаётся на страницу Яндекса.');
     send({ type: 'down', ...coords(event) });
   });
   img.addEventListener('pointermove', event => {
+    if (event.pointerType === 'mouse' && img.naturalWidth) selectedPoint = coords(event);
     if (!dragging || Date.now() - lastMove < 65) return;
     lastMove = Date.now();
     send({ type: 'move', ...coords(event) });
@@ -191,7 +197,12 @@
     submitAnswer(() => send({ type: 'up', ...coords(event) }));
   }
   img.addEventListener('pointerup', finishDrag);
-  img.addEventListener('pointercancel', finishDrag);
+  img.addEventListener('pointercancel', () => { if (!dragging) return; dragging = false; send({ type: 'up', ...selectedPoint }).catch(() => {}); });
+  img.addEventListener('keydown', event => {
+    if (!['Enter', ' '].includes(event.key) || !selectedPoint || submitting || !waiting || !token) return;
+    event.preventDefault();
+    submitAnswer(() => send({ type: 'click', ...selectedPoint }));
+  });
   img.addEventListener('wheel', event => {
     if (!waiting || !token || !img.naturalWidth) return;
     event.preventDefault();
@@ -232,5 +243,5 @@
   }
   checkJob();
   refreshImage();
-  setInterval(checkJob, 2000);
+  setInterval(checkJob, 1000);
 }());

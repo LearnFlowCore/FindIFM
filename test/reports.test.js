@@ -32,6 +32,7 @@ test('отчёт и динамика учитывают поисковый за�
     db.prepare("INSERT INTO search_history (job_id,query,status) VALUES ('one','ключ','completed'),('two','другой','completed')").run();
     const insert = db.prepare('INSERT INTO results (job_id,url,domain,title,date,description,query) VALUES (?,?,?,?,?,?,?)');
     insert.run('one', 'https://example.org/a', 'example.org', '=1+1', '2026-09-30', 'Описание', 'ключ');
+    db.prepare("UPDATE results SET sentiment='negative' WHERE url='https://example.org/a'").run();
     insert.run('one', 'https://example.org/b', 'example.org', 'Вторая', '2026-10-01', 'Описание', 'ключ');
     insert.run('one', 'https://example.org/c', 'example.org', 'Без даты', null, 'Описание', 'ключ');
     insert.run('two', 'https://other.org/d', 'other.org', 'Чужая', '2026-09-30', 'Описание', 'другой');
@@ -46,6 +47,7 @@ test('отчёт и динамика учитывают поисковый за�
     assert.equal(report.status, 200);
     const result = await report.json();
     assert.equal(result.count, 1);
+    assert.deepEqual(result.results, [{ url: 'https://example.org/a', title: '=1+1', sentiment: 'negative' }]);
     const file = await fetch(`${service.url}${result.url}`);
     assert.equal(file.status, 200);
     const content = await file.text();
@@ -53,6 +55,7 @@ test('отчёт и динамика учитывают поисковый за�
     assert.match(content, /example\.org.*ключ/);
     assert.match(content, /'=?1\+1/);
     assert.match(content, /https:\/\/example.org\/a/);
+    assert.match(content, /Тональность[\s\S]*negative/);
     assert.doesNotMatch(content, /https:\/\/example.org\/b|https:\/\/other.org\/d/);
     const byDate = await fetch(`${service.url}/api/export/by-query-date`, { method: 'POST', headers, body: JSON.stringify({ jobId: 'one' }) });
     assert.equal(byDate.status, 200);

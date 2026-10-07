@@ -14,7 +14,7 @@ async function exportXlsx(rows, filename) {
     { header: 'Запрос', key: 'query', width: 30 }, { header: 'Дата поиска', key: 'search_date', width: 22 },
     { header: 'Дата запуска поиска', key: 'search_run_date', width: 22 },
     { header: 'Категория', key: 'category', width: 22 }, { header: 'Длина текста', key: 'text_length', width: 15 },
-    { header: 'Есть медиа', key: 'has_media', width: 13 },
+     { header: 'Есть медиа', key: 'has_media', width: 13 }, { header: 'Тональность', key: 'sentiment', width: 18 },
   ];
   sheet.addRows(rows);
   sheet.getRow(1).eachCell(cell => { cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF17324D' } }; });
@@ -23,7 +23,7 @@ async function exportXlsx(rows, filename) {
     if (index > 1 && index % 2 === 0) row.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F6F8' } }; });
     if (index > 1) row.getCell('url').value = { text: row.getCell('url').value, hyperlink: row.getCell('url').value };
   });
-  sheet.autoFilter = { from: 'A1', to: 'L1' };
+   sheet.autoFilter = { from: 'A1', to: 'M1' };
   await workbook.xlsx.writeFile(filename);
   return filename;
 }
@@ -37,7 +37,7 @@ function exportCsv(rows, filename, { full = false } = {}) {
     ? [['url', 'URL'], ['domain', 'Домен'], ['title', 'Заголовок'], ['date', 'Дата'],
       ['description', 'Описание'], ['status', 'Статус'], ['query', 'Запрос'],
       ['search_date', 'Дата поиска'], ['search_run_date', 'Дата запуска поиска'],
-      ['category', 'Категория'], ['text_length', 'Длина текста'], ['has_media', 'Есть медиа']]
+       ['category', 'Категория'], ['text_length', 'Длина текста'], ['has_media', 'Есть медиа'], ['sentiment', 'Тональность']]
     : [['url', 'URL'], ['title', 'Заголовок страницы'], ['date', 'Дата публикации'], ['description', 'Краткое описание']];
   const lines = [fields.map(([, label]) => label), ...rows.map(row => fields.map(([key]) => row[key]))]
     .map(row => row.map(csvCell).join(';'));

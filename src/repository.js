@@ -27,6 +27,9 @@ class Repository {
     this.db.prepare("UPDATE search_history SET status=?,results_count=?,duplicates_count=?,error=?,progress=100,finished_at=datetime('now','localtime'),updated_at=datetime('now','localtime') WHERE job_id=?")
       .run(status, resultsCount, duplicatesCount, error, jobId);
   }
+  updatePartialResults(jobId) {
+    this.db.prepare('UPDATE search_history SET results_count=(SELECT COUNT(*) FROM results WHERE job_id=?),updated_at=datetime(\'now\',\'localtime\') WHERE job_id=?').run(jobId, jobId);
+  }
   updateTask(jobId, status, progress, message = null) {
     this.db.prepare("UPDATE search_history SET status=?,progress=?,message=?,started_at=CASE WHEN ?='running' AND started_at IS NULL THEN datetime('now','localtime') ELSE started_at END,updated_at=datetime('now','localtime') WHERE job_id=?").run(status, progress, message, status, jobId);
   }
@@ -36,6 +39,7 @@ class Repository {
   taskLogs(jobId, limit = 200) { return this.db.prepare('SELECT * FROM task_logs WHERE job_id=? ORDER BY id DESC LIMIT ?').all(jobId, Math.min(500, Math.max(1, Number(limit) || 200))).reverse(); }
   tasks({ status } = {}) { return status ? this.db.prepare('SELECT * FROM search_history WHERE status=? ORDER BY id DESC LIMIT 200').all(status) : this.db.prepare('SELECT * FROM search_history ORDER BY id DESC LIMIT 200').all(); }
   hasUrl(url) { return Boolean(this.db.prepare('SELECT 1 FROM results WHERE url_normalized=? LIMIT 1').get(url)); }
+  hasJobUrl(jobId, url) { return Boolean(this.db.prepare('SELECT 1 FROM results WHERE job_id=? AND url_normalized=? LIMIT 1').get(jobId, url)); }
   addResults(jobId, rows) {
     const statement = this.db.prepare(`INSERT INTO results
        (job_id,url,url_normalized,domain,title,date,description,query,search_date,search_run_date,status,snippet_match,category,text_length,has_media,evidence,semantic_score,sentiment)

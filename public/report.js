@@ -14,7 +14,7 @@
       <button class="button primary" type="submit">Сформировать</button>
     </form>
     <section class="report-progress" hidden role="status" aria-live="polite"><div class="report-loader" aria-hidden="true"></div><strong>Формируем отчёт…</strong><p>Подбираем ссылки за указанный период и готовим файл для скачивания.</p><span id="reportElapsed">Прошло: 0 с</span></section>
-     <section class="report-done" hidden role="status" aria-live="polite"><strong>Отчёт успешно сформирован</strong><p id="reportCount"></p><p id="reportPeriod" class="report-period"></p><a id="reportDownload" class="button primary" download>↓ Скачать</a><button type="button" class="button secondary" id="reportAgain">Другой отчёт</button></section>
+      <section class="report-done" hidden role="status" aria-live="polite"><strong>Отчёт сформирован</strong><p id="reportCount"></p><p id="reportPeriod" class="report-period"></p><a id="reportDownload" class="button primary" download>↓ Скачать</a><button type="button" class="button secondary" id="reportAgain">Другой отчёт</button><div class="report-links"><strong>Собранные ссылки</strong><p id="reportLinksHint"></p><ol id="reportLinks"></ol></div></section>
     <p id="reportError" class="report-error" role="alert" hidden></p>
   </div>`;
   document.body.append(overlay);
@@ -23,7 +23,27 @@
   let jobId = null;
   let controller = null;
   let ticker = null;
-  function size() { $('.report-dialog').style.width = `${Math.max(400, Math.floor((window.innerWidth - 32) / 80) * 80)}px`; }
+  function size() { $('.report-dialog').style.width = `${Math.min(720, Math.max(0, window.innerWidth - 32))}px`; }
+  function renderLinks(rows) {
+    const list = $('#reportLinks');
+    list.replaceChildren();
+    $('#reportLinksHint').textContent = rows.length ? `${rows.length} ссылок в отчёте. Нажмите на публикацию, чтобы открыть её.` : 'Для выбранного поиска и периода сохранённых ссылок нет.';
+    const sentiments = { positive: 'Положительная', neutral: 'Нейтральная', negative: 'Отрицательная' };
+    for (const row of rows) {
+      const item = document.createElement('li');
+      const link = document.createElement('a');
+      const url = String(row.url || '');
+      if (!/^https?:\/\//i.test(url)) continue;
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = row.title || url;
+      const address = document.createElement('small'); address.textContent = url;
+      const tone = document.createElement('span'); tone.textContent = sentiments[row.sentiment] || 'Тональность не определена';
+      item.append(link, address, tone);
+      list.append(item);
+    }
+  }
   window.addEventListener('resize', size);
   function stage(number) {
     overlay.querySelectorAll('[data-step]').forEach(item => item.classList.toggle('active', Number(item.dataset.step) === number));
@@ -65,8 +85,9 @@
       if (overlay.hidden || controller !== currentController) return;
        $('#reportCount').textContent = `Найдено ссылок: ${result.count}. Файл: ${result.file}`;
        $('#reportPeriod').textContent = from || to ? `Дата публикации: ${from || 'начало'} — ${to || 'конец'}` : 'Период публикаций: без ограничения';
-      $('#reportDownload').href = result.url;
-      $('#reportDownload').download = result.file;
+       $('#reportDownload').href = result.url;
+       $('#reportDownload').download = result.file;
+       renderLinks(result.results || []);
       stage(3);
     } catch (error) {
       if (error.name !== 'AbortError' && !overlay.hidden && controller === currentController) {
