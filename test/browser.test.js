@@ -34,6 +34,96 @@ test('CAPTCHA при skip завершает поиск Яндекса ошиб�
   assert.equal(notified, true);
 });
 
+test('поздний редирект на CAPTCHA распознаётся до разбора пустой выдачи', async () => {
+  const browser = new YandexBrowser({}, {}, 'data');
+  browser.captchaDetectionWindow = 2000;
+  let checks = 0;
+  browser.isCaptcha = async () => { checks += 1; return checks >= 3; };
+  browser.hasSearchCards = async () => false;
+  let notified = false;
+  await assert.rejects(browser.waitForResults({}, { captchaStrategy: 'skip' }, () => { notified = true; }), CaptchaError);
+  assert.equal(notified, true);
+  assert.equal(checks, 3);
+});
+
+test('адрес showcaptcha Яндекса считается блокировкой, обычная выдача — нет', async () => {
+  const browser = new YandexBrowser({}, {}, 'data');
+  browser.evaluate = async () => ({
+    url: 'https://yandex.ru/showcaptcha?form-fb-hint=2.1&retpath=aHR0cHM6Ly95YW5kZXgucnUvc2VhcmNo',
+    path: '/showcaptcha', title: 'Are you not a robot?', captcha: false,
+  });
+  assert.equal(await browser.isCaptcha({}), true);
+  browser.evaluate = async () => ({ url: 'https://yandex.ru/search/?text=%D0%BA%D0%B0%D0%BF%D1%87%D0%B0', path: '/search/', title: ' капча — Яндекс', captcha: false });
+  assert.equal(await browser.isCaptcha({}), false);
+});
+
+test('пустая выдача после редиректа на CAPTCHA повторяет страницу вместо ошибки', async () => {
+  const browser = new YandexBrowser({}, { warn() {} }, 'data');
+  const page = {
+    closed: false, isClosed() { return this.closed; }, close: async () => { page.closed = true; },
+    waitForSelector: async () => {}, setViewport: async () => {},
+  };
+  browser.open = async () => ({ once() {}, newPage: async () => page });
+  browser.navigate = async () => ({ status: () => 200 });
+  browser.waitForResults = async () => true;
+  browser.waitForSearchCards = async () => true;
+  let captchaChecks = 0;
+  browser.isCaptcha = async () => { captchaChecks += 1; return captchaChecks === 1; };
+  let reads = 0;
+  const row = { title: 'Новость', url: 'https://example.com/a', snippet: 'текст', dateText: '' };
+  browser.evaluate = async (target, fn) => {
+    if (String(fn).includes('serp-item')) { reads += 1; return reads === 1 ? [] : [row]; }
+    return { title: 'Are you not a robot?', body: '', url: 'https://yandex.ru/showcaptcha?x=1' };
+  };
+  let notified = 0, solved = 0;
+  const collected = await browser.collect(
+    { yandexText: 'тест' },
+    { maxPages: 1, maxResults: 10, maxDurationMinutes: 5, captchaStrategy: 'manual', pageDelay: 0, pageJitter: 0 },
+    { onCaptcha: () => { notified += 1; }, onCaptchaSolved: () => { solved += 1; } },
+  );
+  assert.equal(collected.length, 1);
+  assert.equal(notified, 1);
+  assert.equal(solved, 1);
+  assert.equal(browser.captchaPage, null);
+});
+
+test('HTTP 429 показывает блокировку и открывает страницу после паузы', async () => {
+  const browser = new YandexBrowser({}, { warn() {} }, 'data');
+  browser.rateLimitDelays = [5, 5, 5];
+  const page = {
+    closed: false, isClosed() { return this.closed; }, close: async () => { page.closed = true; },
+    waitForSelector: async () => {}, setViewport: async () => {},
+  };
+  browser.open = async () => ({ once() {}, newPage: async () => page });
+  const statuses = [429, 200, 200];
+  browser.navigate = async () => ({ status: () => statuses.shift() ?? 200 });
+  browser.waitForResults = async () => true;
+  browser.waitForSearchCards = async () => true;
+  browser.isCaptcha = async () => false;
+  const row = { title: 'Новость', url: 'https://example.com/a', snippet: 'текст', dateText: '' };
+  browser.evaluate = async (target, fn) => (String(fn).includes('serp-item') ? [row] : []);
+  let notified = 0, solved = 0;
+  const collected = await browser.collect(
+    { yandexText: 'тест' },
+    { maxPages: 1, maxResults: 10, maxDurationMinutes: 5, captchaStrategy: 'manual', pageDelay: 0, pageJitter: 0 },
+    { onCaptcha: () => { notified += 1; }, onCaptchaSolved: () => { solved += 1; } },
+  );
+  assert.equal(collected.length, 1);
+  assert.equal(notified, 1);
+  assert.equal(solved, 1);
+  assert.equal(browser.captchaPage, null);
+});
+
+test('HTTP 429 при стратегии skip сразу завершает поиск', async () => {
+  const browser = new YandexBrowser({}, {}, 'data');
+  let notified = 0;
+  await assert.rejects(
+    browser.waitForRateLimit({ isClosed: () => false }, 'https://yandex.ru/search/', { captchaStrategy: 'skip' }, { onCaptcha: () => { notified += 1; } }),
+    CaptchaError,
+  );
+  assert.equal(notified, 1);
+});
+
 test('ручная CAPTCHA предоставляет изображение и ограничивает действия текущей страницей', async () => {
   const browser = new YandexBrowser({}, {}, 'data');
   const events = [];

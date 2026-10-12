@@ -41,6 +41,11 @@ class YandexBrowser {
     this.config = config; this.log = logger; this.dataRoot = dataRoot;
     this.temporaryProfile = this.newTemporaryProfile();
     this.browser = null; this.signature = null; this.captchaPage = null;
+    // Окно, в течение которого ищем редирект на CAPTCHA после загрузки страницы.
+    this.captchaDetectionWindow = 6000;
+    this.captchaPollInterval = 400;
+    // Паузы перед повторными открытиями страницы при HTTP 429.
+    this.rateLimitDelays = [15000, 30000, 60000];
   }
   newTemporaryProfile() {
     return path.join(this.dataRoot, 'data', `browser-profile-${process.pid}-${crypto.randomBytes(4).toString('hex')}`);
@@ -88,33 +93,75 @@ class YandexBrowser {
   }
   async isCaptcha(page) {
     const state = await this.evaluate(page, () => ({
-      url: location.href, title: document.title,
+      url: location.href, path: location.pathname, title: document.title.trim(),
       captcha: Boolean(document.querySelector('[class*="Captcha"],[class*="captcha"],iframe[src*="captcha"],form[action*="captcha"]')),
     }));
-    return state.captcha || /captcha|showcaptcha|подтвердите/i.test(`${state.url} ${state.title}`);
+    if (state.captcha) return true;
+    if (/captcha|showcaptcha|smartcaptcha/i.test(state.url)) return true;
+    // Похожий заголовок встречается и у обычной выдачки, поэтому доверяем ему
+    // только на страницах вне /search.
+    if (!/^(are you not a robot|подтвердите|проверка|не робот)/i.test(state.title)) return false;
+    return !/^\/search/i.test(state.path);
+  }
+  // Держит страницу открытой, пока Яндекс не примет решение пользователя.
+  async resolveCaptcha(page, settings, hooks = {}) {
+    if (settings.captchaStrategy === 'manual') this.captchaPage = page;
+    hooks.onCaptcha?.();
+    if (settings.captchaStrategy === 'skip') throw new CaptchaError('Яндекс запросил CAPTCHA; поиск остановлен.');
+    const expiresAt = settings.captchaStrategy === 'manual' ? Date.now() + 15 * 60000 : Infinity;
+    try {
+      while (page && !page.isClosed()) {
+        if (hooks.isCancelled?.()) throw new Error('Поиск остановлен пользователем');
+        if (Date.now() >= expiresAt) throw new CaptchaError('Время ручного подтверждения CAPTCHA истекло (15 минут).', 'CAPTCHA_TIMEOUT');
+         await sleep(750);
+        if (!(await this.isCaptcha(page))) { hooks.onCaptchaSolved?.(); return true; }
+      }
+      throw new CaptchaError('Окно CAPTCHA закрыто до подтверждения.');
+    } finally { if (this.captchaPage === page) this.captchaPage = null; }
+  }
+  async hasSearchCards(page) {
+    try {
+      return await this.evaluate(page, () => Boolean(document.querySelector('li.serp-item,.Organic,[data-cid],.OrganicTitle-Link[href],[class*="OrganicTitle"] a[href],h2 a[href]')));
+    } catch (error) { return false; }
   }
   async waitForResults(page, settings, onCaptcha, hooks = {}) {
-    const handleCaptcha = async () => {
-      if (settings.captchaStrategy === 'manual') this.captchaPage = page;
-      onCaptcha?.();
-      if (settings.captchaStrategy === 'skip') throw new CaptchaError('Яндекс запросил CAPTCHA; поиск остановлен.');
-      const expiresAt = settings.captchaStrategy === 'manual' ? Date.now() + 15 * 60000 : Infinity;
-      try {
-        while (page && !page.isClosed()) {
-          if (hooks.isCancelled?.()) throw new Error('Поиск остановлен пользователем');
-          if (Date.now() >= expiresAt) throw new CaptchaError('Время ручного подтверждения CAPTCHA истекло (15 минут).', 'CAPTCHA_TIMEOUT');
-           await sleep(750);
-          if (!(await this.isCaptcha(page))) { hooks.onCaptchaSolved?.(); return true; }
-        }
-        throw new CaptchaError('Окно CAPTCHA закрыто до подтверждения.');
-      } finally { if (this.captchaPage === page) this.captchaPage = null; }
-    };
-    // CAPTCHA is identifiable as soon as the DOM navigation completes. Keep a
-    // short second check for slower redirects without delaying the common path.
-    if (await this.isCaptcha(page)) return handleCaptcha();
-    await sleep(800);
-    if (!(await this.isCaptcha(page))) return true;
-    return handleCaptcha();
+    const captchaHooks = { ...hooks, onCaptcha };
+    // CAPTCHA is identifiable as soon as the DOM navigation completes. The
+    // redirect can also arrive a few seconds later, so keep polling while the
+    // page shows neither results nor a CAPTCHA.
+    if (await this.isCaptcha(page)) return this.resolveCaptcha(page, settings, captchaHooks);
+    const deadline = Date.now() + this.captchaDetectionWindow;
+    while (Date.now() < deadline) {
+      await sleep(this.captchaPollInterval);
+      if (await this.isCaptcha(page)) return this.resolveCaptcha(page, settings, captchaHooks);
+      if (await this.hasSearchCards(page)) return true;
+    }
+    if (await this.isCaptcha(page)) return this.resolveCaptcha(page, settings, captchaHooks);
+    return true;
+  }
+  // HTTP 429 означает, что Яндекс считывает слишком частые запросы. Показываем
+  // блокировку, ждём паузу и пробуем открыть страницу заново; если открылась
+  // CAPTCHA — переходим к обычному подтверждению.
+  async waitForRateLimit(page, url, settings, hooks = {}) {
+    if (settings.captchaStrategy === 'skip') {
+      hooks.onCaptcha?.({ reason: 'rate_limit' });
+      throw new CaptchaError('Яндекс вернул HTTP 429; поиск остановлен.');
+    }
+    const manual = settings.captchaStrategy === 'manual';
+    let notified = false;
+    try {
+      for (const delay of this.rateLimitDelays) {
+        if (hooks.isCancelled?.()) throw new Error('Поиск остановлен пользователем');
+        if (manual) this.captchaPage = page;
+        if (!notified) { notified = true; hooks.onCaptcha?.({ reason: 'rate_limit' }); }
+        await sleep(delay);
+        if (hooks.isCancelled?.()) throw new Error('Поиск остановлен пользователем');
+        if (await this.isCaptcha(page)) return await this.resolveCaptcha(page, settings, hooks);
+        const response = await this.navigate(page, url, 25000);
+        if (response?.status() !== 429) { hooks.onCaptchaSolved?.(); return true; }
+      }
+      throw new CaptchaError('Яндекс вернул HTTP 429: ограничение частоты запросов не снято.');
+    } finally { if (this.captchaPage === page) this.captchaPage = null; }
   }
   async captchaScreenshot() {
     const page = this.captchaPage;
@@ -191,7 +238,11 @@ class YandexBrowser {
         hooks.onSearchPage?.(number);
         const url = this.searchUrl(query, number);
         const response = await this.navigate(page, url);
-        if (response?.status() === 429) throw new CaptchaError('Яндекс вернул HTTP 429');
+        if (response?.status() === 429) {
+          await this.waitForRateLimit(page, url, settings, hooks);
+          number -= 1;
+          continue;
+        }
         if (response?.status() >= 400) throw new Error(`Яндекс вернул HTTP ${response.status()}`);
         if (!(await this.waitForResults(page, settings, hooks.onCaptcha, hooks))) break;
         if (!(await this.waitForSearchCards(page))) break;
@@ -217,10 +268,18 @@ class YandexBrowser {
           }
           throw error;
         }
-        if (!rows.length && number === 0) {
-          const state = await this.evaluate(page, () => ({ title: document.title, body: document.body?.innerText?.slice(0, 400) || '', url: location.href }));
-          if (!/ничего не нашлось|ничего не найдено|по вашему запросу ничего/i.test(state.body)) {
-            throw new Error(`Не удалось распознать веб-выдачу Яндекса: ${state.url} (${state.title})`);
+        if (!rows.length) {
+          // Редирект на CAPTCHA может прийти уже после первичной проверки выдачи.
+          if (await this.isCaptcha(page)) {
+            await this.resolveCaptcha(page, settings, hooks);
+            number -= 1;
+            continue;
+          }
+          if (number === 0) {
+            const state = await this.evaluate(page, () => ({ title: document.title, body: document.body?.innerText?.slice(0, 400) || '', url: location.href }));
+            if (!/ничего не нашлось|ничего не найдено|по вашему запросу ничего/i.test(state.body)) {
+              throw new Error(`Не удалось распознать веб-выдачу Яндекса: ${state.url} (${state.title})`);
+            }
           }
         }
         collected.push(...rows);

@@ -43,8 +43,10 @@ class JobManager {
        settings.deadlineAt = job.deadlineAt;
         const { candidates, withinDuplicates, pausedCaptcha = false } = await this.provider.search(query, settings, {
         isCancelled: () => Boolean(job.cancelled),
-        onCaptcha: () => {
-          job.captcha = true; job.status = 'waiting_captcha'; job.message = settings.captchaStrategy === 'skip'
+        onCaptcha: detail => {
+          job.captcha = true; job.status = 'waiting_captcha'; job.message = detail?.reason === 'rate_limit'
+            ? 'Яндекс ограничил частоту запросов (HTTP 429): страница откроется через несколько секунд, при необходимости пройдите проверку ниже.'
+            : settings.captchaStrategy === 'skip'
             ? 'Яндекс запросил CAPTCHA: поиск будет остановлен.'
             : settings.captchaStrategy === 'manual' ? 'Яндекс запросил CAPTCHA: пройдите проверку ниже на странице результатов (до 15 минут).'
             : 'Капча/блокировка: пройдите проверку в окне Яндекс Браузера';
