@@ -303,3 +303,7 @@ tbody tr:hover { background: #f6f8ff; }
   }
   #searchView.active > #searchForm > * { flex: 0 0 auto; }
 }
+
+/* Авторские права разработчика в сайдбаре. */
+.sidebar-copyright { display: block; margin-top: 18px; padding: 0 12px; font-size: 10px; color: #5e7189; }
+@media (max-width: 800px) { .sidebar-copyright { margin-top: 7px; padding: 0 3px; } }
