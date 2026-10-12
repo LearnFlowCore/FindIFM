@@ -271,3 +271,35 @@ tbody tr:hover { background: #f6f8ff; }
 .report-links li a, .report-links li small, .report-links li span { display: block; }
 .report-links li small { color: var(--muted); word-break: break-all; }
 .report-links li span { font-size: 12px; color: var(--muted); }
+
+/* Refresh button: visible feedback while status and data reload. */
+.refresh-glyph { display: inline-block; line-height: 1; }
+.icon-button.is-busy { color: var(--blue); border-color: var(--blue); cursor: progress; }
+.icon-button.is-busy .refresh-glyph { animation: signal-refresh-spin .8s linear infinite; }
+@keyframes signal-refresh-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .icon-button.is-busy .refresh-glyph { animation: none; } }
+.quick-start ol { gap: 5px; line-height: 1.45; margin: 2px 0 12px; }
+
+/* First search screen fills the browser window evenly and needs no scrolling. */
+@media (min-width: 801px) {
+  .main-content { display: flex; flex-direction: column; min-height: 100vh; padding-bottom: clamp(20px, 3.4vh, 64px); }
+  .main-content > .topbar, .main-content > .view { flex: none; }
+  .topbar { margin-bottom: clamp(18px, 4vh, 38px); }
+  .section-intro { margin-bottom: clamp(12px, 2vh, 25px); }
+  .search-card { padding: clamp(18px, 2.6vh, 28px) clamp(20px, 2.4vw, 30px); }
+  #searchForm .workflow-step { margin-top: clamp(12px, 2vh, 22px); }
+  #searchForm .form-grid { gap: clamp(14px, 2.4vh, 23px); }
+  #searchForm .quiet-group { margin-top: clamp(12px, 1.8vh, 20px); }
+  #searchForm .form-footer { padding-top: clamp(16px, 2.4vh, 22px); }
+  #searchView.active { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+  #searchView.active > * { flex: 0 0 auto; }
+  #searchView.active > #quickStart { width: 100%; max-width: 1200px; }
+  #searchView.active > #searchForm {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 0;
+  }
+  #searchView.active > #searchForm > * { flex: 0 0 auto; }
+}
