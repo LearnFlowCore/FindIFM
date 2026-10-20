@@ -17,25 +17,14 @@ h1 { margin: 5px 0; font-size: 27px; }
 .status.error { background: #ffe5e5; color: #9b2828; }
 main { padding: 18px clamp(14px, 4vw, 42px) 36px; }
 .captcha-intro { margin: 0 0 14px; color: #455976; line-height: 1.5; }
-.toolbar, .action-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
-.toolbar { margin-top: 12px; }
-.toolbar span { color: #52647e; }
 .screen { position: relative; background: #dce4ef; border: 1px solid #c8d4e5; border-radius: 10px; min-height: 260px; overflow: auto; }
 .screen-loading { display: grid; place-items: center; min-height: 260px; color: #455976; font-weight: 700; text-align: center; padding: 20px; }
 .screen img { display: none; width: 1000px; height: auto; max-width: none; touch-action: none; user-select: none; cursor: default; }
 .screen.ready img { display: block; }
 .screen.ready .screen-loading { display: none; }
 .screen.fit img { max-width: 100%; width: 1000px; }
-.controls { background: #fff; border-radius: 10px; margin-top: 15px; padding: 17px; display: grid; gap: 10px; }
-.controls label { font-weight: 700; }
-.controls input { min-width: 180px; flex: 1; padding: 10px; border: 1px solid #bfcce0; border-radius: 8px; }
-.controls small { color: #586781; line-height: 1.5; }
-.extra-controls { border-top: 1px solid #e1e7f0; padding-top: 11px; }
-.view-options { margin-top: 14px; }
-.view-options summary, .extra-controls summary { cursor: pointer; font-weight: 650; color: #245ecd; }
-.extra-controls .action-row { margin-top: 10px; }
 #hint { color: #455976; line-height: 1.5; padding: 13px 16px; background: #fff; border-radius: 9px; }
-@media (max-width: 600px) { .top { align-items: flex-start; } .controls button { flex: 1 1 auto; } }
+@media (max-width: 600px) { .top { align-items: flex-start; } }
 .cookie-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 16px; background: #142441cc; }
 .cookie-overlay[hidden] { display: none; }
 .cookie-dialog { width: min(100%, 560px); padding: clamp(24px, 5vw, 38px); border-radius: 18px; background: #fff; box-shadow: 0 24px 75px #081b3677; }
@@ -54,18 +43,15 @@ button:focus-visible, input:focus-visible { outline-color: var(--accent); }
 button.primary { background: var(--accent); border-color: var(--accent); }
 button.primary:hover { background: #bd5935; border-color: #bd5935; }
 button[aria-pressed="true"] { background: #fff0cc; border-color: #e3a955; }
-.top, .controls, #hint, .cookie-dialog { background: var(--paper); }
+.top, #hint, .cookie-dialog { background: var(--paper); }
 .top { border-bottom-color: var(--line); }
-.brand, .cookie-kicker, .view-options summary, .extra-controls summary { color: var(--teal); }
+.brand, .cookie-kicker { color: var(--teal); }
 h1, .cookie-dialog h2 { font-family: Georgia, "Times New Roman", serif; color: var(--navy); }
-.top p, .controls small, .toolbar span, .screen-loading, #hint, .captcha-intro, .cookie-dialog p { color: var(--muted); }
+.top p, .screen-loading, #hint, .captcha-intro, .cookie-dialog p { color: var(--muted); }
 .status { background: #fff0cc; color: #82500f; }
 .status.done { background: #def2e8; color: #16765f; }
 .status.error { background: #fbe2df; color: #a33d3a; }
 .screen { background: #e8eee7; border-color: var(--line); border-radius: 12px; }
-.controls { border-radius: 15px; }
-.controls input { background: var(--paper); border-color: var(--line); }
-.extra-controls { border-top-color: var(--line); }
 .cookie-overlay { background: rgba(23,43,42,.78); }
 .cookie-dialog { border-radius: 15px; box-shadow: 0 24px 75px rgba(23,43,42,.3); }
 
@@ -77,7 +63,7 @@ main { width: 100%; max-width: 1184px; margin-inline: auto; }
 .submit-feedback[hidden] { display: none; }
 .submit-spinner { width: 22px; height: 22px; border: 3px solid #ffffff80; border-top-color: #fff; border-radius: 50%; animation: submit-spin .7s linear infinite; flex: none; }
 .screen.submitting img { opacity: .6; }
-.controls button:disabled { opacity: .7; cursor: progress; }
+button:disabled { opacity: .7; cursor: progress; }
 @keyframes submit-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .submit-spinner { animation: none; border-color: #fff; } }
 @media (max-width: 600px) {
@@ -89,7 +75,5 @@ main { width: 100%; max-width: 1184px; margin-inline: auto; }
   .screen.fit img { display: none; width: 100%; max-width: 100%; }
   .screen.fit.ready img { display: block; }
   .screen:not(.fit) { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .controls .action-row input { min-width: 0; flex-basis: 100%; font-size: 16px; }
-  .controls .action-row button { min-width: 0; }
   .submit-feedback { box-sizing: border-box; }
 }

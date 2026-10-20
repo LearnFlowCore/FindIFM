@@ -13,18 +13,8 @@
     <span id="status" class="status" role="status">Подключаемся...</span>
   </div></header>
   <main>
-    <p class="captcha-intro">Нажмите на «Я не робот» прямо на изображении — щелчок мышью или касание сразу передаётся Яндексу. Галочка появится, если Яндекс примет нажатие. Для ответа словами выберите поле на изображении и введите текст ниже.</p>
+    <p class="captcha-intro">Нажмите на «Я не робот» прямо на изображении — щелчок мышью или касание сразу передаётся Яндексу. Галочка появится, если Яндекс примет нажатие.</p>
     <div class="screen fit" id="screen" aria-label="Изображение проверки Яндекса"><div id="loading" class="screen-loading" role="status">Загружаем изображение проверки…</div><img id="image" draggable="false" tabindex="0" alt="Страница проверки Яндекса: щёлкните мышью или коснитесь нужного места; для управления с клавиатуры нажмите Enter или пробел"><div id="submitFeedback" class="submit-feedback" role="status" aria-live="polite" hidden><span class="submit-spinner" aria-hidden="true"></span><strong id="submitMessage">Передаём ответ Яндексу…</strong></div></div>
-    <details class="view-options"><summary>Масштаб и обновление изображения</summary><div class="toolbar">
-      <button id="fit" type="button" aria-pressed="true">По ширине</button>
-      <button id="fullSize" type="button" aria-pressed="false">Оригинальный размер</button>
-      <button id="refresh" type="button">↻ Обновить изображение</button>
-    </div></details>
-    <div class="controls">
-      <label for="answer">Если нужно ввести текст</label>
-      <div class="action-row"><input id="answer" type="text" inputmode="text" enterkeyhint="done" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Ответ с изображения"><button id="type" type="button" class="primary">Отправить текст ↗</button></div>
-      <details class="extra-controls"><summary>Другие действия</summary><div class="action-row"><button id="enter" type="button">Подтвердить выбор ↗</button><button id="tab" type="button">Следующее поле</button><button id="backspace" type="button">⌫ Удалить символ</button><button id="scrollUp" type="button">↑ Прокрутить страницу</button><button id="scrollDown" type="button">↓ Прокрутить страницу</button></div></details>
-    </div>
     <p id="hint" role="status" aria-live="polite">Загружаем CAPTCHA…</p>
   </main>
   <div class="cookie-overlay" id="cookieOverlay" hidden>

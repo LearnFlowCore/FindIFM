@@ -18,6 +18,7 @@
   let screenshotWidth = 0;
   let screenshotHeight = 0;
   let cookieDismissed = false;
+  let firstImage = true;
   const img = $('image');
   $('showCookiePage').addEventListener('click', () => { cookieDismissed = true; $('cookieOverlay').hidden = true; });
   $('acceptCookies').addEventListener('click', async () => {
@@ -50,10 +51,8 @@
     submitting = false;
     $('screen').classList.remove('submitting');
     $('submitFeedback').hidden = true;
-    $('type').disabled = false;
-    $('enter').disabled = false;
   }
-  async function submitAnswer(action, button) {
+  async function submitAnswer(action) {
     if (submitting || !waiting) return;
     refreshTimers.forEach(clearTimeout);
     refreshTimers = [];
@@ -61,7 +60,6 @@
     $('screen').classList.add('submitting');
     $('submitFeedback').hidden = false;
     $('submitMessage').textContent = 'Передаём ответ Яндексу…';
-    if (button) button.disabled = true;
     setStatus('Отправляем ответ…');
     try {
       await action();
@@ -123,6 +121,7 @@
         screenshotWidth = screenshot.width;
         screenshotHeight = screenshot.height;
         img.src = screenshot.image; if (!submitting) setStatus('Ожидаем вашего ответа');
+        if (firstImage) { firstImage = false; setHint('Изображение проверки загружено.'); }
         if (!screenshot.cookieConsent) cookieDismissed = false;
         const showConsent = Boolean(screenshot.cookieConsent) && !cookieDismissed;
         const overlay = $('cookieOverlay');
@@ -225,38 +224,6 @@
     send({ type: 'scroll', ...coords(event), value: event.deltaY }).then(() => setTimeout(refreshImage, 250)).catch(() => {});
   }, { passive: false });
 
-  $('type').addEventListener('click', async () => {
-    const input = $('answer');
-    if (!input.value.trim()) { input.focus(); return; }
-    if (submitting) return;
-    await submitAnswer(async () => {
-      await send({ type: 'text', value: input.value.trim() });
-      await send({ type: 'key', value: 'Enter' });
-      input.value = '';
-    }, $('type'));
-  });
-  $('answer').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); $('type').click(); } });
-  for (const [id, key] of [['enter', 'Enter'], ['tab', 'Tab'], ['backspace', 'Backspace']]) {
-    $(id).addEventListener('click', () => {
-      if (id === 'enter' && $('answer').value.trim()) {
-        setHint('Для текстового ответа нажмите «Отправить текст».');
-        return;
-      }
-      if (id === 'enter') submitAnswer(() => send({ type: 'key', value: key }), $(id));
-      else send({ type: 'key', value: key }).catch(() => {});
-    });
-  }
-  for (const [id, delta] of [['scrollUp', -500], ['scrollDown', 500]]) {
-    $(id).addEventListener('click', () => send({ type: 'scroll', x: 500, y: 350, value: delta }).then(() => setTimeout(refreshImage, 250)).catch(() => {}));
-  }
-  $('refresh').addEventListener('click', refreshImage);
-  for (const [id, fit] of [['fit', true], ['fullSize', false]]) {
-    $(id).addEventListener('click', () => {
-      $('screen').classList.toggle('fit', fit);
-      $('fit').setAttribute('aria-pressed', String(fit));
-      $('fullSize').setAttribute('aria-pressed', String(!fit));
-    });
-  }
   checkJob();
   refreshImage();
   setInterval(checkJob, 1000);
