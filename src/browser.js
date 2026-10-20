@@ -5,6 +5,11 @@ const crypto = require('node:crypto');
 const puppeteer = require('puppeteer-core');
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+// Страховка от зависших операций браузера: запрос не должен ждать минутами.
+const withTimeout = (promise, ms, message) => new Promise((resolve, reject) => {
+  const timer = setTimeout(() => reject(new Error(message)), ms);
+  promise.then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
+});
 const randomDelay = (base, jitter) => Math.max(0, base + Math.round((Math.random() * 2 - 1) * jitter));
 
 function applySearchParams(url, query, pageNumber) {
@@ -46,6 +51,9 @@ class YandexBrowser {
     this.captchaPollInterval = 400;
     // Паузы перед повторными открытиями страницы при HTTP 429.
     this.rateLimitDelays = [15000, 30000, 60000];
+    // Снимок CAPTCHA и окно cookie не должны подвешивать окно проверки.
+    this.captchaScreenshotTimeout = 25000;
+    this.cookieConsentTimeout = 5000;
   }
   newTemporaryProfile() {
     return path.join(this.dataRoot, 'data', `browser-profile-${process.pid}-${crypto.randomBytes(4).toString('hex')}`);
@@ -91,12 +99,19 @@ class YandexBrowser {
     }
     throw lastError;
   }
-  async isCaptcha(page) {
-    const state = await this.evaluate(page, () => ({
+  async pageState(page) {
+    return this.evaluate(page, () => ({
       url: location.href, path: location.pathname, title: document.title.trim(),
       captcha: Boolean(document.querySelector('[class*="Captcha"],[class*="captcha"],iframe[src*="captcha"],form[action*="captcha"]')),
+      // Яндекс отвечает такой страницей на устаревшую или заблокированную
+      // сессию проверки: решать здесь нечего, страницу нужно запросить заново.
+      blocked: /bad request|ошибка 40\d|something went wrong|что-то пошло не так/i.test(`${document.title} ${(document.body?.innerText || '').slice(0, 400)}`),
     }));
+  }
+  async isCaptcha(page) {
+    const state = await this.pageState(page);
     if (state.captcha) return true;
+    if (state.blocked) return false;
     if (/captcha|showcaptcha|smartcaptcha/i.test(state.url)) return true;
     // Похожий заголовок встречается и у обычной выдачки, поэтому доверяем ему
     // только на страницах вне /search.
@@ -145,7 +160,7 @@ class YandexBrowser {
   async waitForRateLimit(page, url, settings, hooks = {}) {
     if (settings.captchaStrategy === 'skip') {
       hooks.onCaptcha?.({ reason: 'rate_limit' });
-      throw new CaptchaError('Яндекс вернул HTTP 429; поиск остановлен.');
+      throw new CaptchaError('Яндекс ограничил доступ к выдаче; поиск остановлен.');
     }
     const manual = settings.captchaStrategy === 'manual';
     let notified = false;
@@ -158,17 +173,23 @@ class YandexBrowser {
         if (hooks.isCancelled?.()) throw new Error('Поиск остановлен пользователем');
         if (await this.isCaptcha(page)) return await this.resolveCaptcha(page, settings, hooks);
         const response = await this.navigate(page, url, 25000);
-        if (response?.status() !== 429) { hooks.onCaptchaSolved?.(); return true; }
+        const status = response?.status() ?? 0;
+        let pageBlocked = false;
+        try { pageBlocked = (await this.pageState(page)).blocked; } catch { /* страница ещё переходит */ }
+        if (status !== 429 && status < 400 && !pageBlocked) { hooks.onCaptchaSolved?.(); return true; }
       }
-      throw new CaptchaError('Яндекс вернул HTTP 429: ограничение частоты запросов не снято.');
+      throw new CaptchaError('Яндекс ограничил доступ к выдаче: ограничение не снято.');
     } finally { if (this.captchaPage === page) this.captchaPage = null; }
   }
   async captchaScreenshot() {
     const page = this.captchaPage;
     if (!page || page.isClosed()) throw new Error('Окно CAPTCHA уже недоступно.');
+    const state = await this.pageState(page).catch(() => ({ blocked: false }));
+    if (state.blocked) throw new Error('Яндекс отклонил страницу проверки (HTTP 400). Поиск повторит запрос автоматически.');
     const [image, cookieConsent] = await Promise.all([
-      page.screenshot({ type: 'jpeg', quality: 65 }),
-      this.captchaCookieConsent(),
+      withTimeout(page.screenshot({ type: 'jpeg', quality: 65 }), this.captchaScreenshotTimeout, 'Яндекс не отдал изображение проверки. Нажмите ↻ в основной вкладке.'),
+      // Окно cookie не должно задерживать показ самой CAPTCHA.
+      withTimeout(this.captchaCookieConsent(), this.cookieConsentTimeout, 'Окно cookie Яндекса не прочитано').catch(() => null),
     ]);
     return { image: `data:image/jpeg;base64,${image.toString('base64')}`, width: page.viewport().width, height: page.viewport().height,
       cookieConsent };
@@ -238,14 +259,24 @@ class YandexBrowser {
         hooks.onSearchPage?.(number);
         const url = this.searchUrl(query, number);
         const response = await this.navigate(page, url);
-        if (response?.status() === 429) {
+        const status = response?.status();
+        // 429 и страницы «Bad Request»/403 означают, что Яндекс временно
+        // блокирует выдачу: ждём паузу и повторяем этот же номер страницы.
+        if (status === 429 || (status >= 400 && status !== 404)) {
           await this.waitForRateLimit(page, url, settings, hooks);
           number -= 1;
           continue;
         }
-        if (response?.status() >= 400) throw new Error(`Яндекс вернул HTTP ${response.status()}`);
+        if (status >= 400) throw new Error(`Яндекс вернул HTTP ${status}`);
         if (!(await this.waitForResults(page, settings, hooks.onCaptcha, hooks))) break;
-        if (!(await this.waitForSearchCards(page))) break;
+        if (!(await this.waitForSearchCards(page))) {
+          let blocked = false;
+          try { blocked = (await this.pageState(page)).blocked; } catch { /* страница ещё переходит */ }
+          if (!blocked) break;
+          await this.waitForRateLimit(page, url, settings, hooks);
+          number -= 1;
+          continue;
+        }
         let rows;
         try {
           rows = await this.evaluate(page, () => {

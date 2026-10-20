@@ -76,27 +76,39 @@
     } catch (error) { setHint(`Не удалось отправить ответ: ${error.message}`); }
     finally { finishSubmitFeedback(); }
   }
-  async function request(path, options = {}) {
+  async function request(path, options = {}, timeoutMs = 20000) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 25000);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetch(path, {
         ...options,
         signal: controller.signal,
         headers: { Accept: 'application/json', ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(appToken ? { 'X-App-Token': appToken } : {}), ...(options.headers || {}) },
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || `Ошибка сервера ${response.status}`);
+      const body = await response.text();
+      let data = null;
+      if (body.trim()) {
+        try { data = JSON.parse(body); }
+        catch { throw new Error(`Сервер вернул некорректный ответ (${response.status}).`); }
+      }
+      if (!response.ok) throw new Error(data?.error || `Ошибка сервера ${response.status}`);
+      if (!data) throw new Error(`Сервер вернул пустой ответ (${response.status}).`);
       return data;
+    } catch (error) {
+      if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+        throw new Error(`Сервер не ответил за ${Math.round(timeoutMs / 1000)} секунд. Нажмите ↻ в основной вкладке.`);
+      }
+      if (error instanceof TypeError) throw new Error('Нет связи с сервером проверки. Проверьте соединение.');
+      throw error;
     } finally { clearTimeout(timer); }
   }
   function access() { if (!token) throw new Error('Ожидаем доступ от основной вкладки. Откройте это окно кнопкой в разделе «Результаты».'); }
-  function captchaRequest(action) {
+  function captchaRequest(action, timeoutMs = 20000) {
     access();
     return request(`/api/jobs/${encodeURIComponent(jobId)}/captcha`, {
       ...(action ? { method: 'POST', body: JSON.stringify(action) } : {}),
       headers: { 'X-Captcha-Token': token },
-    });
+    }, timeoutMs);
   }
   function send(action) {
     if (!waiting) return Promise.resolve();
@@ -116,7 +128,7 @@
     if (!waiting || !token || loading || dragging) return;
     loading = true;
     try {
-      const screenshot = await captchaRequest();
+      const screenshot = await captchaRequest(null, 40000);
       if (waiting && !dragging) {
         screenshotWidth = screenshot.width;
         screenshotHeight = screenshot.height;

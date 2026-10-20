@@ -147,6 +147,53 @@ test('ручная CAPTCHA предоставляет изображение и 
   await assert.rejects(browser.captchaScreenshot(), /недоступно/);
 });
 
+test('страница Яндекса «400 Bad Request» не считается CAPTCHA', async () => {
+  const browser = new YandexBrowser({}, {}, 'data');
+  browser.evaluate = async () => ({
+    url: 'https://yandex.ru/showcaptcha?retpath=aHR0cHM6Ly95YW5kZXgucnUvc2VhcmNo', path: '/showcaptcha',
+    title: '400', captcha: false, blocked: true,
+  });
+  assert.equal(await browser.isCaptcha({}), false);
+});
+
+test('HTTP 400 от Яндекса повторяет страницу после паузы вместо ожидания CAPTCHA', async () => {
+  const browser = new YandexBrowser({}, { warn() {} }, 'data');
+  browser.rateLimitDelays = [5, 5, 5];
+  const page = {
+    closed: false, isClosed() { return this.closed; }, close: async () => { page.closed = true; },
+    waitForSelector: async () => {}, setViewport: async () => {},
+  };
+  browser.open = async () => ({ once() {}, newPage: async () => page });
+  const statuses = [400, 200];
+  browser.navigate = async () => ({ status: () => statuses.shift() ?? 200 });
+  browser.waitForResults = async () => true;
+  browser.waitForSearchCards = async () => true;
+  browser.isCaptcha = async () => false;
+  const row = { title: 'Новость', url: 'https://example.com/a', snippet: 'текст', dateText: '' };
+  browser.evaluate = async (target, fn) => (String(fn).includes('serp-item') ? [row] : { blocked: false });
+  let notified = 0;
+  const collected = await browser.collect(
+    { yandexText: 'тест' },
+    { maxPages: 1, maxResults: 10, maxDurationMinutes: 5, captchaStrategy: 'manual', pageDelay: 0, pageJitter: 0 },
+    { onCaptcha: () => { notified += 1; } },
+  );
+  assert.equal(collected.length, 1);
+  assert.equal(notified, 1);
+  assert.equal(browser.captchaPage, null);
+});
+
+test('зависший снимок CAPTCHA завершается понятной ошибкой вместо вечного ожидания', async () => {
+  const browser = new YandexBrowser({}, {}, 'data');
+  browser.captchaScreenshotTimeout = 20;
+  browser.cookieConsentTimeout = 20;
+  browser.captchaPage = {
+    isClosed: () => false, viewport: () => ({ width: 1000, height: 720 }),
+    screenshot: () => new Promise(() => {}), frames: () => [],
+  };
+  await assert.rejects(browser.captchaScreenshot(), /не отдал изображение/);
+  browser.captchaPage = null;
+});
+
 test('окно cookie Яндекса показывается над CAPTCHA и принимает согласие только по действию пользователя', async () => {
   const browser = new YandexBrowser({}, {}, 'data');
   const originalDocument = global.document;

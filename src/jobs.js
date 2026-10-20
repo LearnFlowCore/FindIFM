@@ -45,7 +45,7 @@ class JobManager {
         isCancelled: () => Boolean(job.cancelled),
         onCaptcha: detail => {
           job.captcha = true; job.status = 'waiting_captcha'; job.message = detail?.reason === 'rate_limit'
-            ? 'Яндекс ограничил частоту запросов (HTTP 429): страница откроется через несколько секунд, при необходимости пройдите проверку ниже.'
+            ? 'Яндекс временно ограничил доступ к выдаче: страница откроется автоматически через несколько секунд, при необходимости пройдите проверку ниже.'
             : settings.captchaStrategy === 'skip'
             ? 'Яндекс запросил CAPTCHA: поиск будет остановлен.'
             : settings.captchaStrategy === 'manual' ? 'Яндекс запросил CAPTCHA: пройдите проверку ниже на странице результатов (до 15 минут).'
