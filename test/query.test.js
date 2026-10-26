@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseQuery, buildYandexText, textMatches } = require('../src/utils/query');
+const { parseQuery, buildYandexText, textMatches, yandexSearchParams, describePredicates, queryPreview } = require('../src/utils/query');
 
 test('обычный поиск сохраняет глубокий обход, уменьшить его можно явно', () => {
   assert.equal(parseQuery({ query: 'Министерство' }).deepPages, 12);
@@ -56,4 +56,38 @@ test('проверяет диапазон длины текста', () => {
 test('сохраняет фильтр тональности в критериях поиска', () => {
   assert.equal(parseQuery({ query: 'тест', sentiment: 'negative' }).sentiment, 'negative');
   assert.equal(parseQuery({ query: 'тест', sentiment: 'unknown' }).sentiment, 'any');
+});
+
+test('явные границы дат важнее относительного периода в параметрах Яндекса', () => {
+  assert.deepEqual(yandexSearchParams({ within: '7', from: '2024-03-01', to: '2024-03-08' }), { date: '20240301-20240308' });
+  assert.deepEqual(yandexSearchParams({ within: '7' }), { within: '7' });
+  assert.deepEqual(yandexSearchParams({}), {});
+});
+
+test('предикаты показывают период, домены, слова и тональность', () => {
+  const query = parseQuery({
+    query: 'Иванов 15.03.2024', period: 'week', whitelist: ['ria.ru'], excludeKeywords: ['реклама'],
+    sentiment: 'negative', deepPages: 4, media: 'present',
+  });
+  const labels = Object.fromEntries(describePredicates(query).map(item => [item.label, item.value]));
+  assert.equal(labels['Дата из запроса'], '15.03.2024');
+  assert.equal(labels['Период публикации'], '08.03.2024 — 22.03.2024');
+  assert.equal(labels['Только домены'], 'ria.ru');
+  assert.equal(labels['Исключённые слова'], 'реклама');
+  assert.equal(labels['Тональность'], 'отрицательная');
+  assert.equal(labels['Медиа'], 'есть изображение или видео');
+});
+
+test('предпросмотр запроса содержит фактический текст и датовые параметры', () => {
+  const preview = queryPreview(parseQuery({ query: 'Иванов 15.03.2024', period: 'week' }));
+  assert.equal(preview.yandexText, 'Иванов');
+  assert.match(preview.searchUrl, /date=20240308-20240322/);
+  assert.equal(preview.searchUrl.includes('within='), false);
+});
+
+test('выбирает соцсети и отбрасывает неизвестные названия', () => {
+  assert.deepEqual(parseQuery({ query: 'тест', social: ['vk', 'VK', 'unknown', 'max'] }).social, ['vk', 'max']);
+  assert.equal(parseQuery({ query: 'тест', social: true }).social.length > 0, true);
+  assert.deepEqual(parseQuery({ query: 'тест' }).social, []);
+  assert.equal(parseQuery({ query: 'тест', social: ['vk'] }).socialPages, 1);
 });

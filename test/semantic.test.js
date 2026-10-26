@@ -69,21 +69,40 @@ test('выдержки поисковых результатов сохраня�
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
 
-test('API объясняет, что для поиска по смыслу и сводки нужен ключ модели', async () => {
+test('поиск по смыслу работает без ключа, а сводка моделью требует AI_API_KEY', async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'signal-semantic-api-'));
   const previous = process.env.AI_API_KEY;
   delete process.env.AI_API_KEY;
   let service;
   try {
     service = await startServer({ dataRoot: directory, host: '127.0.0.1', port: 0, token: 'test-token' });
-    for (const [route, body] of [['/api/search', { semantic: true, query: 'школа' }], ['/api/semantic/summary', { question: 'Что произошло?', rows: [] }]]) {
-      const response = await fetch(`${service.url}${route}`, { method: 'POST', headers: { 'X-App-Token': 'test-token', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      assert.equal(response.status, 503);
-      assert.match((await response.json()).error, /AI_API_KEY/);
-    }
+    const headers = { 'X-App-Token': 'test-token', 'Content-Type': 'application/json' };
+    const status = await (await fetch(`${service.url}/api/status`, { headers })).json();
+    assert.equal(status.semanticAvailable, true);
+    assert.equal(status.semanticModel, false);
+    const response = await fetch(`${service.url}/api/semantic/summary`, {
+      method: 'POST', headers, body: JSON.stringify({ question: 'Что произошло?', rows: [] }),
+    });
+    assert.equal(response.status, 503);
+    assert.match((await response.json()).error, /AI_API_KEY/);
   } finally {
     if (service) await service.stop();
     if (previous !== undefined) process.env.AI_API_KEY = previous;
     fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('локальное ранжирование по смыслу не требует модели и ставит релевантный фрагмент первым', async () => {
+  const previous = process.env.AI_API_KEY;
+  delete process.env.AI_API_KEY;
+  try {
+    const found = await rank('закрытие школы', [
+      { url: 'https://example.org/a', text: 'Совсем другая тема про спорт' },
+      { url: 'https://example.org/b', text: 'Закрытие школы подтвердили в ведомстве' },
+    ]);
+    assert.equal(found[0].url, 'https://example.org/b');
+    assert.ok(found[0].semanticScore > 0.1);
+  } finally {
+    if (previous !== undefined) process.env.AI_API_KEY = previous;
   }
 });

@@ -1,5 +1,6 @@
 // Формирование совместимой с Excel книги с базовым оформлением.
 const ExcelJS = require('exceljs');
+const { formatDate } = require('./utils/date');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -16,7 +17,7 @@ async function exportXlsx(rows, filename) {
     { header: 'Категория', key: 'category', width: 22 }, { header: 'Длина текста', key: 'text_length', width: 15 },
      { header: 'Есть медиа', key: 'has_media', width: 13 }, { header: 'Тональность', key: 'sentiment', width: 18 },
   ];
-  sheet.addRows(rows);
+  sheet.addRows(rows.map(row => ({ ...row, date: formatDate(row.date) })));
   sheet.getRow(1).eachCell(cell => { cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF17324D' } }; });
   sheet.eachRow((row, index) => {
     row.alignment = { vertical: 'top', wrapText: true };
@@ -39,7 +40,7 @@ function exportCsv(rows, filename, { full = false } = {}) {
       ['search_date', 'Дата поиска'], ['search_run_date', 'Дата запуска поиска'],
        ['category', 'Категория'], ['text_length', 'Длина текста'], ['has_media', 'Есть медиа'], ['sentiment', 'Тональность']]
     : [['url', 'URL'], ['title', 'Заголовок страницы'], ['date', 'Дата публикации'], ['description', 'Краткое описание']];
-  const lines = [fields.map(([, label]) => label), ...rows.map(row => fields.map(([key]) => row[key]))]
+  const lines = [fields.map(([, label]) => label), ...rows.map(row => fields.map(([key]) => key === 'date' ? formatDate(row.date) : row[key]))]
     .map(row => row.map(csvCell).join(';'));
   require('node:fs').writeFileSync(filename, `\uFEFF${lines.join('\r\n')}\r\n`, 'utf8');
   return filename;

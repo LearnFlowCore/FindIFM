@@ -62,6 +62,7 @@ test('отчёт и динамика учитывают поисковый за�
     assert.match(content, /'=?1\+1/);
     assert.match(content, /https:\/\/example.org\/a/);
     assert.match(content, /Тональность[\s\S]*negative/);
+    assert.match(content, /30\.09\.2026/);
     assert.doesNotMatch(content, /https:\/\/example.org\/b|https:\/\/other.org\/d/);
     const byDate = await fetch(`${service.url}/api/export/by-query-date`, { method: 'POST', headers, body: JSON.stringify({ jobId: 'one' }) });
     assert.equal(byDate.status, 200);

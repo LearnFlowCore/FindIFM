@@ -3,9 +3,10 @@
   const panel = document.createElement('section');
   panel.id = 'analyticsPanel';
   panel.className = 'card analytics-panel';
-  panel.hidden = true;
+  panel.hidden = false;
   panel.innerHTML = `
-    <div class="analytics-head"><div><span class="workflow-kicker">АНАЛИТИКА / В РЕАЛЬНОМ ВРЕМЕНИ</span><h3>Скорость реагирования</h3><p id="analyticsQuery"></p></div><span id="analyticsStatus" role="status">Загрузка</span></div>
+    <div class="analytics-head"><div><span class="workflow-kicker">АНАЛИТИКА / В РЕАЛЬНОМ ВРЕМЕНИ</span><h3>Скорость реагирования</h3><p id="analyticsQuery">Выберите запуск из истории или выполните поиск</p></div><span id="analyticsStatus" role="status">Ожидание</span></div>
+    <div class="analytics-picker"><label>Поисковый запуск<select id="analyticsRun"><option value="">Выберите запуск</option></select></label></div>
     <div class="analytics-metrics">
       <div class="analytics-metric" id="spikeMetric"><span>От всплеска до уведомления</span><strong id="spikeTime">Не измерено</strong><small id="spikeState">Ожидание отметки всплеска</small><div class="analytics-track"><div id="spikeBar"></div></div><small>Шкала: 60 минут</small></div>
       <div class="analytics-metric" id="responseMetric"><span>От уведомления до реакции ведомства</span><strong id="responseTime">Не измерено</strong><small id="responseState">Ожидание отметки уведомления</small><div class="analytics-track"><div id="responseBar"></div></div><small>Шкала: 4 часа</small></div>
@@ -41,9 +42,12 @@
     </form>
     <div class="analytics-quick"><button type="button" data-mark-event="spikeAt" class="mini-button">Всплеск сейчас</button><button type="button" data-mark-event="notifiedAt" class="mini-button">Уведомлено сейчас</button><button type="button" data-mark-event="responseAt" class="mini-button">Реакция сейчас</button></div>
     <p id="analyticsMessage" role="status"></p>`;
-  document.querySelector('#captchaPanel').after(panel);
+  const mount = document.querySelector('#analyticsMount');
+  if (mount) mount.append(panel);
+  else document.querySelector('#captchaPanel')?.after(panel);
   const $ = selector => panel.querySelector(selector);
   const form = $('#analyticsForm');
+  const runSelect = $('#analyticsRun');
   let selected = null;
   let data = null;
   let requestNumber = 0;
@@ -123,10 +127,26 @@
     selected = id;
     editing = false;
     data = null;
+    if (runSelect) runSelect.value = id;
     $('#analyticsMessage').textContent = '';
     $('#analyticsStatus').textContent = 'Загрузка';
     panel.hidden = false;
     fetchAnalytics(id);
+  }
+  async function loadRuns() {
+    if (!runSelect) return;
+    try {
+      const response = await fetch('/api/history', { headers: header() });
+      const runs = await response.json();
+      if (!response.ok || !Array.isArray(runs)) return;
+      runSelect.innerHTML = '';
+      runSelect.append(new Option('Выберите запуск', ''));
+      for (const run of runs) {
+        const stamp = run.timestamp ? new Date(String(run.timestamp).replace(' ', 'T')).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : '';
+        runSelect.append(new Option(`${run.query}${stamp ? ` · ${stamp}` : ''}`, run.job_id));
+      }
+      runSelect.value = selected || '';
+    } catch { /* история недоступна */ }
   }
   async function save(changes) {
     if (!selected) return;
@@ -162,8 +182,11 @@
     const field = event.target.closest('[data-mark-event]')?.dataset.markEvent;
     if (field) save({ [field]: new Date().toISOString() });
   });
-  window.addEventListener('signal-job-selected', event => select(event.detail.jobId));
+  window.addEventListener('signal-job-selected', event => { select(event.detail.jobId); loadRuns(); });
+  if (runSelect) runSelect.addEventListener('change', () => select(runSelect.value));
+  window.addEventListener('signal-analytics-open', () => { loadRuns(); if (selected) fetchAnalytics(selected); });
+  loadRuns();
   // Незакрытая вкладка обновляет два таймера без опроса сервера каждую секунду.
   setInterval(paint, 1000);
-  setInterval(() => { if (selected && !panel.hidden) fetchAnalytics(selected); }, 10000);
+  setInterval(() => { if (selected && document.getElementById('analyticsView')?.classList.contains('active')) fetchAnalytics(selected); }, 10000);
 }());

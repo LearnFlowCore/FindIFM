@@ -4,11 +4,17 @@ const { domainAllowed } = require('../utils/domain');
 const { parseDate } = require('../utils/date');
 const { buildYandexText, textMatches } = require('../utils/query');
 const { classifySentiment } = require('../utils/sentiment');
+const { SOCIAL_SOURCES, socialSource, socialQueryText, socialAuthor, normalizeKeys } = require('./social');
 
 class SearchProvider { async search() { throw new Error('SearchProvider.search должен быть реализован'); } }
 class YandexAPIProvider extends SearchProvider { async search() { throw new Error('Yandex Search API пока не настроен'); } }
 
-function inRange(date, query) { return !date || ((!query.from || date >= query.from) && (!query.to || date <= query.to)); }
+// Запись без известной даты публикации не подтверждает попадание в период:
+// дата запуска поиска не подставляется вместо неизвестной даты.
+function inRange(date, query) {
+  if (!date) return !query.from && !query.to && !query.extractedDate;
+  return (!query.from || date >= query.from) && (!query.to || date <= query.to);
+}
 const INITIAL_DEEP_PAGES = 4;
 const MAX_DEEP_PAGES = 12;
 function scoreDeepLink(url, query) {
@@ -95,7 +101,7 @@ class YandexHTMLProvider extends SearchProvider {
           let matched = false;
           if ((query.semantic || textMatches(`${page.title} ${page.text}`, query)) && passesContentFilters(page, query)) {
             const date = parseDate(page.dateText) || (entry.depth === 0 ? parseDate(item.dateText) : null) || parseDate(url);
-            if ((!query.extractedDate || date) && inRange(date, query) && !candidateUrls.has(url)) {
+            if (inRange(date, query) && !candidateUrls.has(url)) {
               candidateUrls.add(url);
               candidates.push({ ...item, ...page, url: entry.url, date, normalized: url, snippetMatch, description: page.description || item.snippet });
               if (entry.depth) { siteDeepAccepted += 1; deep.deepAccepted += 1; }
@@ -123,17 +129,69 @@ class YandexHTMLProvider extends SearchProvider {
           this.log.warn({ url, error: error.message }, 'Не удалось загрузить найденную страницу');
            if (entry.depth !== 0 || (!query.semantic && !snippetMatch) || query.category || query.minTextLength || query.maxTextLength || query.media !== 'any' || query.sentiment !== 'any' || query.includeKeywords?.length || query.excludeKeywords?.length) continue;
           const date = parseDate(item.dateText);
-          if ((query.extractedDate && !date) || !inRange(date, query) || candidateUrls.has(url)) continue;
+          if (!inRange(date, query) || candidateUrls.has(url)) continue;
           candidateUrls.add(url);
           candidates.push({ ...item, date, normalized: url, description: String(item.snippet || '').slice(0, 300), snippetMatch: true });
           hooks.onCandidate?.(candidates[candidates.length - 1]);
         }
       }
     }
+    if (normalizeKeys(query.social).length) {
+      const social = await this.collectSocial(query, settings, hooks);
+      for (const item of social) {
+        if (candidates.length >= maxResults) break;
+        if (candidateUrls.has(item.normalized)) continue;
+        candidateUrls.add(item.normalized);
+        candidates.push(item);
+      }
+    }
     const stats = { found: raw.length, duplicates: withinDuplicates, inspected, skipped, accepted: candidates.length, ...deep };
     this.log.info?.(stats, 'Итог проверки поисковых ссылок');
     hooks.onSearchStats?.(stats);
     return { candidates, withinDuplicates, pausedCaptcha };
+  }
+  // Поиск по выбранным соцсетям: один запрос с site: и проверка критериев по
+  // заголовку и сниппету (страницы VK/OK/MAX без входа недоступны для обхода).
+  async collectSocial(query, settings, hooks = {}) {
+    const keys = normalizeKeys(query.social);
+    if (!keys.length) return [];
+    const socialQuery = { ...query, yandexText: socialQueryText(query, keys) };
+    const limit = Math.min(Number(settings.maxResults) || 500, 100);
+    const socialSettings = { ...settings, maxPages: 1, maxDeepPages: 0, maxResults: limit };
+    this.log.info?.({ networks: keys }, 'Поиск по социальным сетям');
+    const rows = await this.browser.collect(socialQuery, socialSettings, hooks);
+    const accepted = [], seen = new Set();
+    for (const row of rows) {
+      if (accepted.length >= limit || hooks.isCancelled?.()) break;
+      const key = socialSource(row.url);
+      if (!key || !keys.includes(key)) continue;
+      const normalized = normalizeUrl(row.url);
+      if (!normalized || seen.has(normalized)) continue;
+      const text = `${row.title || ''} ${row.snippet || ''}`;
+      if (!textMatches(text, query)) continue;
+      const lower = text.toLocaleLowerCase('ru-RU');
+      if (query.includeKeywords?.some(word => !lower.includes(word))) continue;
+      if (query.excludeKeywords?.some(word => lower.includes(word))) continue;
+      const date = parseDate(row.dateText) || parseDate(row.url);
+      if (!inRange(date, query)) continue;
+      const candidate = {
+        ...row, normalized, date, snippetMatch: true, searchType: 'social',
+        network: key, networkLabel: SOCIAL_SOURCES[key].label,
+        category: SOCIAL_SOURCES[key].label, author: socialAuthor(row.url, key),
+        description: String(row.snippet || row.title || '').slice(0, 2000),
+        textLength: String(row.snippet || '').length, hasMedia: false,
+        sentiment: classifySentiment(`${row.title || ''} ${row.snippet || ''}`),
+      };
+      if (query.maxTextLength && candidate.textLength > query.maxTextLength) continue;
+      if (query.minTextLength && candidate.textLength < query.minTextLength) continue;
+      if (query.media === 'present') continue;
+      if (query.sentiment !== 'any' && candidate.sentiment !== query.sentiment) continue;
+      seen.add(normalized);
+      accepted.push(candidate);
+    }
+    hooks.onSocialStats?.({ networks: keys, found: rows.length, accepted: accepted.length });
+    for (const candidate of accepted) hooks.onCandidate?.(candidate);
+    return accepted;
   }
 }
 module.exports = { SearchProvider, YandexHTMLProvider, YandexAPIProvider, inRange, passesContentFilters };

@@ -5,8 +5,8 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+COPY package.json package-lock.json* ./
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev --no-audit --no-fund; fi
 # The image contains the complete project package. Local-only files are
 # excluded by .dockerignore (dependencies, data, logs and Windows output).
 COPY . .

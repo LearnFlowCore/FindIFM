@@ -11,8 +11,15 @@ test('переносит запрос и ограничения в общую в
   assert.equal(parsed.searchParams.get('type'), null);
   assert.equal(parsed.searchParams.get('text'), 'Ромашка новый завод');
   assert.equal(parsed.searchParams.get('p'), '2');
-  assert.equal(parsed.searchParams.get('within'), '7');
+  // Явные границы дат приоритетнее относительного within.
+  assert.equal(parsed.searchParams.get('within'), null);
   assert.equal(parsed.searchParams.get('date'), '20240301-20240308');
+});
+
+test('без явных границ период передаётся через within', () => {
+  const parsed = new URL(applySearchParams('https://yandex.ru/search/', { yandexText: 'тест', within: '7' }, 0));
+  assert.equal(parsed.searchParams.get('within'), '7');
+  assert.equal(parsed.searchParams.get('date'), null);
 });
 
 test('создаёт отдельные URL страниц общего поиска', () => {

@@ -4,14 +4,14 @@ services:
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
-    healthCheckPath: /api/status
+    healthCheckPath: /healthz
     envVars:
       - key: HOST
         value: 0.0.0.0
       - key: OPEN_BROWSER
         value: "0"
       - key: CAPTCHA_STRATEGY
-         value: manual
+        value: manual
       - key: YANDEX_BROWSER_PATH
         value: /usr/bin/chromium
       - key: DATA_ROOT

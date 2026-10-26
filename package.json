@@ -11,6 +11,7 @@
   },
   "scripts": {
     "start": "node src/server.js",
+    "check": "node scripts/check-project.js",
     "test": "node --test test/*.test.js",
     "desktop": "electron .",
     "desktop:rebuild": "electron-builder install-app-deps",

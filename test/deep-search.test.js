@@ -3,11 +3,13 @@ const assert = require('node:assert/strict');
 const { YandexHTMLProvider, inRange } = require('../src/search/provider');
 const { parseQuery } = require('../src/utils/query');
 
-test('дата неизвестной публикации не отбрасывается преждевременно', () => {
+test('период не принимает запись без известной даты публикации', () => {
   const query = parseQuery({ query: 'Министерство', from: '2026-10-07', to: '2026-10-07' });
-  assert.equal(inRange(null, query), true);
+  assert.equal(inRange(null, query), false);
   assert.equal(inRange('2026-10-06', query), false);
   assert.equal(inRange('2026-10-07', query), true);
+  const undated = parseQuery({ query: 'Министерство' });
+  assert.equal(inRange(null, undated), true);
 });
 
 test('короткий сниппет лишь задаёт приоритет: текст статьи всё равно проверяется', async () => {

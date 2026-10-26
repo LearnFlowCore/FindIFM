@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const puppeteer = require('puppeteer-core');
+const { yandexSearchParams } = require('./utils/query');
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 // Страховка от зависших операций браузера: запрос не должен ждать минутами.
@@ -18,9 +19,9 @@ function applySearchParams(url, query, pageNumber) {
   target.searchParams.delete('type');
   target.searchParams.set('text', query.yandexText);
   target.searchParams.set('p', String(pageNumber));
-  if (query.within) target.searchParams.set('within', query.within); else target.searchParams.delete('within');
-  if (query.from && query.to) target.searchParams.set('date', `${query.from.replaceAll('-', '')}-${query.to.replaceAll('-', '')}`);
-  else target.searchParams.delete('date');
+  target.searchParams.delete('within');
+  target.searchParams.delete('date');
+  for (const [key, value] of Object.entries(yandexSearchParams(query))) target.searchParams.set(key, value);
   return target.toString();
 }
 
@@ -350,8 +351,27 @@ class YandexBrowser {
         if (response?.status() >= 400) throw new Error(`HTTP ${response.status()}`);
         return await this.evaluate(page, words => {
           const meta = selector => document.querySelector(selector)?.content || '';
+          const jsonDate = field => {
+            for (const node of document.querySelectorAll('script[type="application/ld+json"]')) {
+              try {
+                const data = JSON.parse(node.textContent);
+                for (const item of Array.isArray(data) ? data : [data]) {
+                  const value = item?.[field] || item?.['@graph']?.find(entry => entry?.[field])?.[field];
+                  if (typeof value === 'string' && value) return value;
+                }
+              } catch { /* некорректный JSON-LD игнорируем */ }
+            }
+            return '';
+          };
           const title = meta('meta[property="og:title"]') || document.title;
-          const date = meta('meta[property="article:published_time"]') || meta('meta[name="date"]') || document.querySelector('time[datetime]')?.dateTime || document.querySelector('time')?.textContent || '';
+          // Дата публикации важнее даты обновления материала.
+          const date = meta('meta[property="article:published_time"]') || meta('meta[name="datePublished"]')
+            || meta('meta[itemprop="datePublished"]') || meta('meta[property="datePublished"]')
+            || jsonDate('datePublished') || meta('meta[name="pubdate"]') || meta('meta[name="publish-date"]')
+            || meta('meta[property="article:modified_time"]') || meta('meta[name="dateModified"]')
+            || jsonDate('dateModified') || meta('meta[name="date"]')
+            || document.querySelector('time[itemprop="datePublished"]')?.dateTime
+            || document.querySelector('time[datetime]')?.dateTime || document.querySelector('time')?.textContent || '';
           const contentRoot = document.querySelector('article,main,[role="main"]') || document.body;
           const candidates = [...(contentRoot?.querySelectorAll('p') || [])].map(item => item.textContent.trim()).filter(item => item.length > 40);
           const description = candidates.find(item => words.some(word => item.toLocaleLowerCase('ru-RU').includes(word))) || meta('meta[name="description"]') || candidates[0] || '';

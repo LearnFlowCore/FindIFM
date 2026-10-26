@@ -1,6 +1,7 @@
 // Разбор произвольного запроса и подготовка операторов Яндекса.
-const { extractDate, resolveDateRange } = require('./date');
+const { extractDate, resolveDateRange, formatDate } = require('./date');
 const { splitRules } = require('./domain');
+const { SOCIAL_KEYS, normalizeKeys } = require('../search/social');
 
 function normalizeText(value) {
   return String(value || '').toLocaleLowerCase('ru-RU').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
@@ -40,6 +41,9 @@ function parseQuery(input = {}) {
     category: normalizeText(input.category), minTextLength, maxTextLength,
     media: ['present', 'absent'].includes(input.media) ? input.media : 'any',
     deduplicate: input.deduplicate !== false, deepPages, quickTest: input.quickTest === true,
+    // Поиск по российским и СНГ соцсетям: массив ключей или true = все сети.
+    social: input.social === true || input.social === 'all' ? SOCIAL_KEYS.slice() : normalizeKeys(input.social),
+    socialPages: Math.min(3, Math.max(1, Number(input.socialPages) || 1)),
   };
 }
 
@@ -65,4 +69,43 @@ function textMatches(text, query) {
   return query.matchMode === 'any' ? query.words.some(matches) : query.words.every(matches);
 }
 
-module.exports = { parseQuery, buildYandexText, normalizeText, textMatches };
+// Параметры датовой выдачи Яндекса: явные границы важнее относительного within.
+function yandexSearchParams(query) {
+  if (query.from && query.to) return { date: `${query.from.replaceAll('-', '')}-${query.to.replaceAll('-', '')}` };
+  if (query.within) return { within: query.within };
+  return {};
+}
+
+const MATCH_LABELS = { exact: 'Точная фраза', strict: 'Все слова строго', any: 'Любое из слов', all: 'Все слова со словоформами' };
+const WITHIN_LABELS = { 1: 'за сутки', 77: 'за неделю', 87: 'за месяц', 367: 'за год' };
+const SENTIMENT_LABELS = { positive: 'положительная', neutral: 'нейтральная', negative: 'отрицательная' };
+
+// Предикаты «Сигнала» для предпросмотра до запуска поиска.
+function describePredicates(query) {
+  const items = [];
+  const push = (label, value) => { if (value) items.push({ label, value: String(value) }); };
+  push('Тип совпадения', MATCH_LABELS[query.matchMode] || MATCH_LABELS.all);
+  if (query.from || query.to) push('Период публикации', `${formatDate(query.from) || 'начало'} — ${formatDate(query.to) || 'сегодня'}`);
+  else if (query.within) push('Период публикации', WITHIN_LABELS[query.within] || query.within);
+  if (query.extractedDate) push('Дата из запроса', formatDate(query.extractedDate));
+  if (query.whitelist?.length) push('Только домены', query.whitelist.join(', '));
+  if (query.blacklist?.length) push('Исключить домены', query.blacklist.join(', '));
+  if (query.includeKeywords?.length) push('Обязательные слова', query.includeKeywords.join(', '));
+  if (query.excludeKeywords?.length) push('Исключённые слова', query.excludeKeywords.join(', '));
+  if (query.category) push('Категория', query.category);
+  if (query.minTextLength || query.maxTextLength) push('Длина текста', `${query.minTextLength || 0}–${query.maxTextLength || '∞'}`);
+  if (query.media !== 'any') push('Медиа', query.media === 'present' ? 'есть изображение или видео' : 'без медиа');
+  if (query.sentiment !== 'any') push('Тональность', SENTIMENT_LABELS[query.sentiment] || query.sentiment);
+  if (query.deepPages) push('Внутренних страниц сайта', `до ${query.deepPages} (не более 12)`);
+  if (query.semantic) push('Семантика', 'сравнение по смыслу');
+  if (query.social?.length) push('Соцсети', query.social.join(', '));
+  return items;
+}
+
+function queryPreview(query) {
+  const text = buildYandexText(query);
+  const search = new URLSearchParams({ text, p: '1', ...yandexSearchParams(query) });
+  return { yandexText: text, searchUrl: `https://yandex.ru/search/?${search}`, predicates: describePredicates(query) };
+}
+
+module.exports = { parseQuery, buildYandexText, textMatches, normalizeText, yandexSearchParams, describePredicates, queryPreview };
