@@ -52,13 +52,14 @@ test('аналитика запуска переживает рестарт и �
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'signal-analytics-'));
   let service;
   try {
-    service = await startServer({ dataRoot: folder, host: '127.0.0.1', port: 0 });
+    service = await startServer({ dataRoot: folder, host: '127.0.0.1', port: 0, token: 'test-token' });
     // Запись запуска без сетевого поиска: публичный API читает ту же историю SQLite.
     const db = openDatabase(service.config.dbPath);
     new Repository(db).addHistory('analytics-job', { original: 'тестовый запрос', extractedDate: null, period: null, from: null, to: null, whitelist: [], blacklist: [] });
     db.close();
+    const auth = { 'X-App-Token': 'test-token' };
     const url = `${service.url}/api/analytics/analytics-job`;
-    const update = body => fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const update = body => fetch(url, { method: 'PUT', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     let response = await update({ spikeAt: '2026-10-04T12:00:00+03:00', notifiedAt: '2026-10-04T12:10:00+03:00' });
     assert.equal(response.status, 200);
     assert.deepEqual((({ spikeToNotificationSeconds, notificationToResponseSeconds }) => ({ spikeToNotificationSeconds, notificationToResponseSeconds }))(await response.json()),
@@ -76,25 +77,25 @@ test('аналитика запуска переживает рестарт и �
     await response.json();
     await new Promise(resolve => setTimeout(resolve, 200));
     await service.stop(); service = null;
-    service = await startServer({ dataRoot: folder, host: '127.0.0.1', port: 0 });
-    const saved = await fetch(`${service.url}/api/analytics/analytics-job`).then(r => r.json());
+    service = await startServer({ dataRoot: folder, host: '127.0.0.1', port: 0, token: 'test-token' });
+    const saved = await fetch(`${service.url}/api/analytics/analytics-job`, { headers: auth }).then(r => r.json());
     assert.equal(saved.spikeToNotificationSeconds, 600);
     assert.equal(saved.notificationToResponseSeconds, 1800);
     assert.deepEqual(saved.mttr, { cases: 1, averageSeconds: 2400 });
     const extraDb = openDatabase(service.config.dbPath);
     new Repository(extraDb).addHistory('second-job', { original: 'второй запрос', extractedDate: null, period: null, from: null, to: null, whitelist: [], blacklist: [] });
     extraDb.close();
-    response = await fetch(`${service.url}/api/analytics/second-job`, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    response = await fetch(`${service.url}/api/analytics/second-job`, { method: 'PUT', headers: { ...auth, 'Content-Type': 'application/json' },
       body: JSON.stringify({ spikeAt: '2026-10-04T10:00:00Z', responseAt: '2026-10-04T10:20:00Z' }) });
     assert.equal(response.status, 200);
     assert.deepEqual((await response.json()).mttr, { cases: 2, averageSeconds: 1800 });
-    response = await fetch(`${service.url}/api/analytics/analytics-job`);
+    response = await fetch(`${service.url}/api/analytics/analytics-job`, { headers: auth });
     assert.deepEqual((await response.json()).mttr, { cases: 2, averageSeconds: 1800 });
-    response = await fetch(`${service.url}/api/analytics/second-job`, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    response = await fetch(`${service.url}/api/analytics/second-job`, { method: 'PUT', headers: { ...auth, 'Content-Type': 'application/json' },
       body: JSON.stringify({ responseAt: '2026-10-04T09:00:00Z' }) });
     assert.equal(response.status, 400);
     await response.json();
-    response = await fetch(`${service.url}/api/analytics/missing-job`);
+    response = await fetch(`${service.url}/api/analytics/missing-job`, { headers: auth });
     assert.equal(response.status, 404);
     await response.json();
   } finally {

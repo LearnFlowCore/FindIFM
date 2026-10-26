@@ -194,6 +194,24 @@ test('зависший снимок CAPTCHA завершается понятн�
   browser.captchaPage = null;
 });
 
+test('снимок CAPTCHA работает без page.viewport в видимом окне браузера', async () => {
+  const browser = new YandexBrowser({}, {}, 'data');
+  const events = [];
+  browser.captchaPage = {
+    isClosed: () => false, viewport: () => null,
+    screenshot: async () => Buffer.from('image'), frames: () => [],
+    mouse: { move: async (x, y) => events.push([x, y]) },
+  };
+  browser.evaluate = async () => ({ width: 1280, height: 800, blocked: false });
+  const shot = await browser.captchaScreenshot();
+  assert.equal(shot.width, 1280);
+  assert.equal(shot.height, 800);
+  assert.equal(shot.image, 'data:image/jpeg;base64,aW1hZ2U=');
+  await browser.captchaAction({ type: 'move', x: 10, y: 20 });
+  assert.deepEqual(events, [[10, 20]]);
+  browser.captchaPage = null;
+});
+
 test('окно cookie Яндекса показывается над CAPTCHA и принимает согласие только по действию пользователя', async () => {
   const browser = new YandexBrowser({}, {}, 'data');
   const originalDocument = global.document;

@@ -181,17 +181,25 @@ class YandexBrowser {
       throw new CaptchaError('Яндекс ограничил доступ к выдаче: ограничение не снято.');
     } finally { if (this.captchaPage === page) this.captchaPage = null; }
   }
+  // В обычном (видимом) окне defaultViewport отключён, поэтому page.viewport()
+  // возвращает null — размеры берём из самой страницы.
+  async viewportSize(page) {
+    const viewport = page.viewport?.();
+    if (viewport?.width > 0 && viewport?.height > 0) return viewport;
+    return this.evaluate(page, () => ({ width: window.innerWidth, height: window.innerHeight }));
+  }
   async captchaScreenshot() {
     const page = this.captchaPage;
     if (!page || page.isClosed()) throw new Error('Окно CAPTCHA уже недоступно.');
     const state = await this.pageState(page).catch(() => ({ blocked: false }));
     if (state.blocked) throw new Error('Яндекс отклонил страницу проверки (HTTP 400). Поиск повторит запрос автоматически.');
+    const size = await this.viewportSize(page);
     const [image, cookieConsent] = await Promise.all([
       withTimeout(page.screenshot({ type: 'jpeg', quality: 65 }), this.captchaScreenshotTimeout, 'Яндекс не отдал изображение проверки. Нажмите ↻ в основной вкладке.'),
       // Окно cookie не должно задерживать показ самой CAPTCHA.
       withTimeout(this.captchaCookieConsent(), this.cookieConsentTimeout, 'Окно cookie Яндекса не прочитано').catch(() => null),
     ]);
-    return { image: `data:image/jpeg;base64,${image.toString('base64')}`, width: page.viewport().width, height: page.viewport().height,
+    return { image: `data:image/jpeg;base64,${image.toString('base64')}`, width: size.width, height: size.height,
       cookieConsent };
   }
   async captchaCookieConsent(accept = false) {
@@ -212,7 +220,7 @@ class YandexBrowser {
     const { type, x, y, value } = action;
     if (type === 'accept_cookies') { await this.captchaCookieConsent(true); return; }
     if (['move', 'down', 'up', 'click', 'scroll'].includes(type)) {
-      const { width, height } = page.viewport();
+      const { width, height } = await this.viewportSize(page);
       if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x > width || y > height) throw new Error('Некорректные координаты.');
       await page.mouse.move(x, y);
       if (type === 'down') await page.mouse.down();

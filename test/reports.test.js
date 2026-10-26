@@ -17,6 +17,12 @@ test('подсветка целой фразы экранирует спецси
   assert.equal(vm.runInNewContext(script.replace(/\}\)\(\)$/, "return pattern.test('C++ example')})()"), { document, NodeFilter: { SHOW_TEXT: 4 } }), true);
 });
 
+test('подсветка страницы помечает свой скрипт nonce, чтобы чужие скрипты блокировались', () => {
+  const html = highlightedHtml('<html><body><p>Текст</p></body></html>', 'https://example.org/', 'Текст', 'abc123');
+  assert.match(html, /<script nonce="abc123">/);
+  assert.equal((html.match(/<script/g) || []).length, 1);
+});
+
 test('сохранённые ссылки группируются по дате публикации и выбранному периоду', () => {
   assert.deepEqual(summarize([
     { date: '2026-09-30' }, { date: '2026-09-30' }, { date: '2026-10-01' }, { date: '' },

@@ -23,6 +23,44 @@ test('desktop API слушает случайный локальный порт 
   }
 });
 
+test('без явного токена API закрыто, а страница получает сгенерированный токен', async () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'mention-monitor-token-'));
+  const saved = process.env.APP_TOKEN;
+  delete process.env.APP_TOKEN;
+  const service = await startServer({ dataRoot: folder, host: '127.0.0.1', port: 0 });
+  try {
+    assert.equal((await fetch(`${service.url}/api/history`)).status, 401);
+    const page = await (await fetch(`${service.url}/`)).text();
+    assert.match(page, /<script src="\/app-token\.js"><\/script>/);
+    const tokenResponse = await fetch(`${service.url}/app-token.js`);
+    assert.equal(tokenResponse.headers.get('cache-control'), 'no-store');
+    const match = (await tokenResponse.text()).match(/window\.__signalToken=("[a-f0-9]{64}")/);
+    assert.ok(match, 'токен отдаётся отдельным скриптом');
+    const token = JSON.parse(match[1]);
+    assert.equal((await fetch(`${service.url}/api/history`, { headers: { 'X-App-Token': token } })).status, 200);
+    assert.equal((await fetch(`${service.url}/api/history`, { headers: { 'X-App-Token': 'wrong' } })).status, 401);
+  } finally {
+    await service.stop();
+    if (saved !== undefined) process.env.APP_TOKEN = saved;
+    fs.rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('предпросмотр страницы требует токен и не пускает запросы во внутреннюю сеть', async () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'mention-monitor-highlight-'));
+  const service = await startServer({ dataRoot: folder, host: '127.0.0.1', port: 0, token: 'test-token' });
+  try {
+    const highlight = (url, token = 'test-token') => `${service.url}/highlight?token=${token}&url=${encodeURIComponent(url)}`;
+    assert.equal((await fetch(`${service.url}/highlight?url=${encodeURIComponent('https://example.com/')}`)).status, 401);
+    for (const url of ['http://127.0.0.1/', 'http://[::ffff:127.0.0.1]/', 'http://169.254.169.254/latest/meta-data', 'http://metadata.internal/']) {
+      assert.equal((await fetch(highlight(url))).status, 400, url);
+    }
+  } finally {
+    await service.stop();
+    fs.rmSync(folder, { recursive: true, force: true });
+  }
+});
+
 test('API возвращает JSON при некорректном теле запроса', async () => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'mention-monitor-json-'));
   const service = await startServer({ dataRoot: folder, host: '127.0.0.1', port: 0, token: 'test-token' });

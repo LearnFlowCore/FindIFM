@@ -75,9 +75,9 @@ test('API объясняет, что для поиска по смыслу и с
   delete process.env.AI_API_KEY;
   let service;
   try {
-    service = await startServer({ dataRoot: directory, host: '127.0.0.1', port: 0 });
+    service = await startServer({ dataRoot: directory, host: '127.0.0.1', port: 0, token: 'test-token' });
     for (const [route, body] of [['/api/search', { semantic: true, query: 'школа' }], ['/api/semantic/summary', { question: 'Что произошло?', rows: [] }]]) {
-      const response = await fetch(`${service.url}${route}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const response = await fetch(`${service.url}${route}`, { method: 'POST', headers: { 'X-App-Token': 'test-token', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       assert.equal(response.status, 503);
       assert.match((await response.json()).error, /AI_API_KEY/);
     }

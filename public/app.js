@@ -3,7 +3,7 @@
   // Панель использует только локальный API; внешних frontend-зависимостей нет.
   const $ = (s, root = document) => root.querySelector(s);
   const $$ = (s, root = document) => [...root.querySelectorAll(s)];
-  const appToken = new URLSearchParams(location.hash.slice(1)).get('token') || sessionStorage.getItem('signal-app-token') || '';
+  const appToken = window.__signalToken || new URLSearchParams(location.hash.slice(1)).get('token') || sessionStorage.getItem('signal-app-token') || '';
   if (appToken) sessionStorage.setItem('signal-app-token', appToken);
   window.signalAppToken = appToken;
   if (location.hash) history.replaceState(null, '', `${location.pathname}${location.search}`);
@@ -66,7 +66,7 @@
   const notify = (message, error = false) => { const item = document.createElement('div'); item.className = `toast${error ? ' error' : ''}`; item.textContent = message; $('#toasts').append(item); $('#liveRegion').textContent = message; setTimeout(() => item.remove(), 4500); };
   const text = value => value == null ? '' : String(value);
   const escape = value => text(value).replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
-  const highlightUrl = row => { const url = new URL('/highlight', location.origin); url.searchParams.set('url', row.url || ''); url.searchParams.set('q', row.query || ''); return url.toString(); };
+  const highlightUrl = row => { const url = new URL('/highlight', location.origin); url.searchParams.set('url', row.url || ''); url.searchParams.set('q', row.query || ''); if (window.signalAppToken) url.searchParams.set('token', window.signalAppToken); return url.toString(); };
   const date = value => value ? new Date(value).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : 'Без даты';
   const jsonList = value => Array.isArray(value) ? value : text(value).split(/[\n,]+/).map(x => x.trim()).filter(Boolean);
   const show = tab => { state.tab = tab; $$('.view').forEach(x => x.classList.toggle('active', x.id === `${tab}View`)); $$('.nav-tab').forEach(x => { const active = x.dataset.tab === tab; x.classList.toggle('active', active); x.setAttribute('aria-selected', active); }); $('#pageTitle').textContent = labels[tab]; if ($('#titleEdit')) $('#titleEdit').hidden = tab !== 'search'; if (tab === 'results') loadResults(); if (tab === 'history') loadHistory(); if (tab === 'saved') loadSavedArchive(); if (tab === 'admin') loadTasks(); if (tab === 'settings') loadSettings(); };

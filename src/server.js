@@ -31,16 +31,22 @@ function remoteUrlAllowed(value) {
   let url;
   try { url = new URL(value); } catch { return false; }
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return false;
-  const host = url.hostname.toLowerCase();
-  if (['localhost', 'localhost.localdomain'].includes(host) || host.endsWith('.localhost') || host === '::1') return false;
-  if (/^(10|127)\./.test(host) || /^169\.254\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)) return false;
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (!host || host === '0.0.0.0' || host === '::' || host === '::1') return false;
+  // IPv6-литералы, включая IPv4-mapped (::ffff:127.0.0.1), не нужны для предпросмотра.
+  if (host.includes(':')) return false;
+  if (['localhost', 'localhost.localdomain'].includes(host) || host.endsWith('.localhost')
+    || host.endsWith('.local') || host.endsWith('.internal')) return false;
+  if (!host.includes('.')) return false;
+  if (/^(10|127|0)\./.test(host) || /^169\.254\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)) return false;
+  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host) || /^192\.0\./.test(host) || /^198\.(1[89])\./.test(host)) return false;
   return true;
 }
 
-function highlightedHtml(html, url, query) {
+function highlightedHtml(html, url, query, nonce = '') {
   const terms = highlightTerms(query);
   const payload = JSON.stringify(terms).replace(/<\//g, '<\\/');
-  const injection = `<base href="${String(url).replace(/"/g, '&quot;')}"><style>mark.signal-hit{background:#ffe66d;color:inherit;padding:0 .08em;border-radius:.16em;box-shadow:0 0 0 1px #f4c43055}</style><script>(function(){const terms=${payload};if(!terms.length)return;const pattern=new RegExp('('+terms.map(x=>x.replace(/[.*+?^\${}()|[\\]\\\\]/g,'\\\\$&')).join('|')+')','giu');const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);const nodes=[];while(walker.nextNode())if(!/^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|INPUT)$/i.test(walker.currentNode.parentElement?.tagName||''))nodes.push(walker.currentNode);for(const node of nodes){const value=node.nodeValue;if(!pattern.test(value)){pattern.lastIndex=0;continue}pattern.lastIndex=0;const fragment=document.createDocumentFragment();let last=0;value.replace(pattern,(hit,_,offset)=>{fragment.append(document.createTextNode(value.slice(last,offset)));const mark=document.createElement('mark');mark.className='signal-hit';mark.textContent=hit;fragment.append(mark);last=offset+hit.length;return hit});fragment.append(document.createTextNode(value.slice(last)));node.replaceWith(fragment)}})()</script>`;
+  const injection = `<base href="${String(url).replace(/"/g, '&quot;')}"><style>mark.signal-hit{background:#ffe66d;color:inherit;padding:0 .08em;border-radius:.16em;box-shadow:0 0 0 1px #f4c43055}</style><script${nonce ? ` nonce="${nonce}"` : ''}>(function(){const terms=${payload};if(!terms.length)return;const pattern=new RegExp('('+terms.map(x=>x.replace(/[.*+?^\${}()|[\\]\\\\]/g,'\\\\$&')).join('|')+')','giu');const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);const nodes=[];while(walker.nextNode())if(!/^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|INPUT)$/i.test(walker.currentNode.parentElement?.tagName||''))nodes.push(walker.currentNode);for(const node of nodes){const value=node.nodeValue;if(!pattern.test(value)){pattern.lastIndex=0;continue}pattern.lastIndex=0;const fragment=document.createDocumentFragment();let last=0;value.replace(pattern,(hit,_,offset)=>{fragment.append(document.createTextNode(value.slice(last,offset)));const mark=document.createElement('mark');mark.className='signal-hit';mark.textContent=hit;fragment.append(mark);last=offset+hit.length;return hit});fragment.append(document.createTextNode(value.slice(last)));node.replaceWith(fragment)}})()</script>`;
   if (/<body\b[^>]*>/i.test(html)) return html.replace(/<\/body>/i, () => `${injection}</body>`);
   return `${injection}${html}`;
 }
@@ -58,7 +64,11 @@ async function startServer(options = {}) {
   const browser = new YandexBrowser(config, log, config.dataRoot);
   const provider = new YandexHTMLProvider(browser, log);
   const internet = { ok: false, detail: 'Проверка не выполнена', checkedAt: null };
-  const token = options.token === undefined ? null : options.token;
+  // Без явного токена (Docker, `npm start`) API должно быть закрыто: генерируем
+  // секрет и отдаём его только вместе со страницей интерфейса.
+  const explicitToken = options.token !== undefined ? options.token : process.env.APP_TOKEN || null;
+  const generatedToken = !explicitToken;
+  const token = explicitToken || crypto.randomBytes(32).toString('hex');
   let stopping = false;
 
   function checkInternet() {
@@ -84,27 +94,58 @@ async function startServer(options = {}) {
   const asyncRoute = handler => (req, res, next) => Promise.resolve(handler(req, res)).catch(next);
   app.disable('x-powered-by');
   app.use(express.json({ limit: config.requestLimit }));
+  // Сгенерированный токен отдаётся отдельным скриптом: CSP интерфейса запрещает
+  // встроенные скрипты, но разрешает same-origin файлы. Без токена API закрыто,
+  // поэтому сторонние сайты и сканеры не смогут им управлять.
+  let indexHtml = null;
+  if (generatedToken) {
+    const source = fs.readFileSync(path.join(config.projectRoot, 'public', 'index.html'), 'utf8');
+    indexHtml = source.replace('<script src="app.js"></script>', () => '<script src="/app-token.js"></script>\n<script src="app.js"></script>');
+    app.get('/app-token.js', (_req, res) => res.set('Cache-Control', 'no-store').type('application/javascript')
+      .send(`window.__signalToken=${JSON.stringify(token)};`));
+    app.get(['/', '/index.html'], (_req, res) => res.set('Cache-Control', 'no-store').type('html').send(indexHtml));
+  }
   app.use(express.static(path.join(config.projectRoot, 'public')));
+  app.use('/highlight', (req, res, next) => (req.query.token === token || req.get('X-App-Token') === token
+    ? next() : res.status(401).send('Недействительная сессия приложения.')));
   app.get('/highlight', asyncRoute(async (req, res) => {
     const target = String(req.query.url || '');
     if (!remoteUrlAllowed(target)) return res.status(400).send('Некорректная внешняя ссылка.');
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20000);
     try {
-      const response = await fetch(target, { signal: controller.signal, headers: { 'User-Agent': 'Signal/1.0 page preview' } });
+      // Редиректы проверяем вручную: иначе публичный адрес может увести запрос
+      // во внутреннюю сеть в обход remoteUrlAllowed.
+      let current = target;
+      let response;
+      for (let hop = 0; hop < 5; hop += 1) {
+        response = await fetch(current, { redirect: 'manual', signal: controller.signal, headers: { 'User-Agent': 'Signal/1.0 page preview' } });
+        if (![301, 302, 303, 307, 308].includes(response.status)) break;
+        const location = response.headers.get('location');
+        if (!location) break;
+        current = new URL(location, current).toString();
+        if (!remoteUrlAllowed(current)) return res.status(400).send('Некорректная внешняя ссылка.');
+      }
       if (!response.ok) return res.status(502).send(`Сайт вернул HTTP ${response.status}.`);
       const type = response.headers.get('content-type') || '';
-      if (!type.includes('text/html')) return res.redirect(target);
+      if (!type.includes('text/html')) return res.redirect(current);
       const html = (await response.text()).slice(0, 4_000_000);
-      res.set('Content-Type', 'text/html; charset=utf-8').send(highlightedHtml(html.replace(/<meta\s+[^>]*http-equiv=["']?Content-Security-Policy["']?[^>]*>/gi, ''), target, req.query.q));
+      const nonce = crypto.randomBytes(16).toString('hex');
+      // Чужие скрипты блокируются: исполняется только наш подсветчик с nonce.
+      res.set({
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Security-Policy': `default-src 'none'; img-src * data: blob:; media-src *; style-src * 'unsafe-inline'; font-src *; script-src 'nonce-${nonce}'; base-uri *; form-action 'none'; frame-src 'none'; object-src 'none'`,
+        'X-Content-Type-Options': 'nosniff',
+        'Referrer-Policy': 'no-referrer',
+      }).send(highlightedHtml(html.replace(/<meta\s+[^>]*http-equiv=["']?Content-Security-Policy["']?[^>]*>/gi, ''), current, req.query.q, nonce));
     } finally { clearTimeout(timer); }
   }));
   app.use('/api', (req, res, next) => {
-    if (!token || req.get('X-App-Token') === token) return next();
+    if (req.get('X-App-Token') === token) return next();
     return res.status(401).json({ error: 'Недействительная сессия приложения.' });
   });
   app.use('/exports', (req, res, next) => {
-    if (!token || req.query.token === token) return next();
+    if (req.query.token === token) return next();
     return res.status(401).send('Недействительная сессия приложения.');
   }, express.static(exportRoot, { index: false, dotfiles: 'deny' }));
 
