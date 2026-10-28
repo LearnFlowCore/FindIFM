@@ -183,3 +183,24 @@ mention-monitor-node/
 При запуске из исходников база находится в `data/mention-monitor.db`, логи в `logs/parser.log`, экспорт в `exports/`. В установленной программе эти каталоги находятся в `%APPDATA%\Signal`. URL нормализуются, UTM/`yclid`/`gclid` удаляются. Значения SQL передаются параметрами. Backend ограничивает размер JSON и не публикуется во внешнюю сеть.
 
 Для будущего Yandex Search API предусмотрен интерфейс `SearchProvider`; текущая реализация называется `YandexHTMLProvider`, заготовка замены — `YandexAPIProvider`.
+
+## Диагностика соцсетей (VK и Telegram)
+
+Сбор статистики VK и Telegram проверяется отдельными командами; основной поиск они не меняют.
+
+```bash
+npm run diagnose:social        # парсеры и конфигурация, без сети
+npm run diagnose:social:live   # реальные запросы к переданным сообществам
+```
+
+Живой режим требует реальные публичные адреса (вымышленные подставлять нельзя):
+
+```bash
+npm run diagnose:social:live -- --target vk=https://vk.com/community --target telegram=https://t.me/channel
+# или
+SOCIAL_TARGETS="vk=https://vk.com/community,telegram=https://t.me/channel" npm run diagnose:social:live
+```
+
+Без целей команда завершается статусом `NO_TARGETS_CONFIGURED` с инструкцией (код 2). Для VK нужен `VK_ACCESS_TOKEN` (официальное API), для Telegram дополнительно можно задать `TELEGRAM_BOT_TOKEN` (`getChatMemberCount`); публичный предпросмотр `t.me/s/<канал>` проверяется и без токена. Токены не выводятся в отчёты.
+
+Отчёты (JSON и Markdown) и SQLite-кэш метрик сохраняются в `diagnostics/` (каталог исключён из Git). Подписчики и просмотры проверяются отдельно; отсутствующее значение остаётся `null` и не заменяется нулём, сокращённые счётчики Telegram помечаются как приблизительные.
