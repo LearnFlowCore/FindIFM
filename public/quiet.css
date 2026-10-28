@@ -350,3 +350,8 @@ tbody tr:hover { background: #f6f8ff; }
 .analytics-picker { margin: 10px 0 14px; }
 .analytics-picker label { display: grid; gap: 5px; font-weight: 650; max-width: 560px; }
 .analytics-picker select { padding: 9px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font: inherit; }
+.voice-search { margin: 12px 0; max-width: 480px; }
+.voice-search .search-input { width: 100%; }
+.voice-search { display: flex; gap: 8px; align-items: center; margin: 12px 0; max-width: 640px; }
+.voice-search .search-input { flex: 1 1 auto; }
+.voice-search .button { white-space: nowrap; }

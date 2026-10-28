@@ -561,6 +561,18 @@
   $('#searchForm .form-footer').insertAdjacentHTML('beforeend', '<button class="button danger stop-search-button" type="button" hidden>■ Остановить поиск</button>');
   $('#resultsView .section-intro').insertAdjacentHTML('beforeend', '<button class="button danger stop-search-button" type="button" hidden>■ Остановить поиск</button>');
   $$('.stop-search-button').forEach(button => button.addEventListener('click', async () => { if (!state.jobId || button.disabled) return; $$('.stop-search-button').forEach(item => { item.disabled = true; item.textContent = 'Останавливаем...'; }); try { await api(`/api/jobs/${encodeURIComponent(state.jobId)}/stop`, { method: 'POST', body: '{}' }); notify('Остановка поиска запрошена'); } catch (error) { notify(error.message, true); $$('.stop-search-button').forEach(item => { item.disabled = false; item.textContent = '■ Остановить поиск'; }); } }));
+  // Запуск поиска из раздела «Министерства»: заполняем форму и используем
+  // обычный запуск, чтобы работали опрос прогресса и окно CAPTCHA.
+  window.addEventListener('signal-run-search', event => {
+    const query = String(event.detail?.query || '').trim();
+    if (!query) return;
+    if (state.searching) { notify('Дождитесь завершения текущего поиска.', true); return; }
+    const form = $('#searchForm');
+    form.query.value = query;
+    form.query.dispatchEvent(new Event('input', { bubbles: true }));
+    show('search');
+    form.requestSubmit();
+  });
   status(); setInterval(status, 10000); setInterval(() => { if (state.tab === 'admin') loadTasks(); }, 5000); loadPresets(); loadSettings(); loadHistory(); loadSavedArchive(); restoreActiveJob();
 
   // Ревизия интерфейса: компактная таблица публикаций и предпросмотр запроса.

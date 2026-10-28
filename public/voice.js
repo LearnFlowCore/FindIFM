@@ -15,13 +15,15 @@
   let available = [];
   let groups = [];
   let requestNumber = 0;
+  let searchText = '';
   const scope = query => JSON.stringify([query, $('#voiceFrom').value, $('#voiceTo').value]);
   const headers = () => window.signalAppToken ? { 'X-App-Token': window.signalAppToken } : {};
 
   function render() {
     const choices = $('#voiceChoices');
     choices.replaceChildren();
-    for (const group of available) {
+    const visible = available.filter(group => !searchText || group.query.toLocaleLowerCase('ru-RU').includes(searchText));
+    for (const group of visible) {
       const label = document.createElement('label');
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
@@ -31,6 +33,7 @@
       choices.append(label);
     }
     if (!available.length) choices.textContent = 'Сначала выполните поиски по названиям министерств.';
+    else if (!visible.length) choices.textContent = `По запросу «${$('#voiceSearch').value.trim()}» министерства не найдены.`;
     const chosen = available.filter(group => selected.has(group.query));
     const counts = new Map(groups.map(group => [group.query, group]));
     const total = chosen.reduce((sum, group) => sum + (counts.get(group.query)?.mentions || 0), 0);
@@ -120,5 +123,20 @@
   $('#voiceRefresh').addEventListener('click', refresh);
   $('#voiceFrom').addEventListener('change', refresh);
   $('#voiceTo').addEventListener('change', refresh);
+  $('#voiceSearch').addEventListener('input', event => {
+    searchText = event.target.value.trim().toLocaleLowerCase('ru-RU');
+    render();
+  });
+  $('#voiceSearchForm').addEventListener('submit', event => {
+    event.preventDefault();
+    const query = $('#voiceSearch').value.trim().replace(/\s+/g, ' ');
+    if (!query) {
+      $('#voiceStatus').textContent = 'Введите название министерства для поиска.';
+      $('#voiceSearch').focus();
+      return;
+    }
+    $('#voiceStatus').textContent = `Запускаем отдельный поиск: «${query}»…`;
+    window.dispatchEvent(new CustomEvent('signal-run-search', { detail: { query } }));
+  });
   document.querySelector('[data-tab="voice"]').addEventListener('click', refresh);
 }());
